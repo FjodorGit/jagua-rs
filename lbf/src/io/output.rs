@@ -1,5 +1,6 @@
 use crate::config::LBFConfig;
 use jagua_rs::probs::bpp::io::ext_repr::{ExtBPInstance, ExtBPSolution};
+use jagua_rs::probs::qpp::io::ext_repr::{ExtQPInstance, ExtQPSolution};
 use jagua_rs::probs::spp::io::ext_repr::{ExtSPInstance, ExtSPSolution};
 use serde::{Deserialize, Serialize};
 
@@ -16,5 +17,13 @@ pub struct BPOutput {
     #[serde(flatten)]
     pub instance: ExtBPInstance,
     pub solution: ExtBPSolution,
+    pub config: LBFConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct QPOutput {
+    #[serde(flatten)]
+    pub instance: ExtQPInstance,
+    pub solution: ExtQPSolution,
     pub config: LBFConfig,
 }

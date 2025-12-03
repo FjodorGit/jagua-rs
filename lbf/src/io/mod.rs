@@ -4,6 +4,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
 use crate::EPOCH;
+use jagua_rs::probs::qpp::io::ext_repr::ExtQPInstance;
 use log::{Level, LevelFilter, info, log};
 use serde::Serialize;
 use svg::Document;
@@ -25,6 +26,12 @@ pub fn read_bpp_instance(path: &Path) -> Result<ExtBPInstance> {
     let file = File::open(path).context("could not open instance file")?;
     serde_json::from_reader(BufReader::new(file))
         .context("not a valid bin packing instance (ExtBPInstance)")
+}
+
+pub fn read_qpp_instance(path: &Path) -> Result<ExtQPInstance> {
+    let file = File::open(path).context("could not open instance file")?;
+    serde_json::from_reader(BufReader::new(file))
+        .context("not a valid strip packing instance (ExtSPInstance)")
 }
 
 pub fn write_json(json: &impl Serialize, path: &Path) -> Result<()> {

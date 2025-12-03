@@ -29,4 +29,6 @@ pub enum ProblemVariant {
     BinPackingProblem,
     #[clap(name = "spp")]
     StripPackingProblem,
+    #[clap(name = "qpp")]
+    QuarePackingProblem,
 }

@@ -8,13 +8,15 @@ use clap::Parser as ClapParser;
 use jagua_rs::io::import::Importer;
 use jagua_rs::io::svg::s_layout_to_svg;
 use jagua_rs::probs::bpp::io::ext_repr::ExtBPInstance;
+use jagua_rs::probs::qpp::io::ext_repr::ExtQPInstance;
 use jagua_rs::probs::spp::io::ext_repr::ExtSPInstance;
-use jagua_rs::probs::{bpp, spp};
+use jagua_rs::probs::{bpp, qpp, spp};
 use lbf::config::LBFConfig;
 use lbf::io::cli::{Cli, ProblemVariant};
-use lbf::io::output::{BPOutput, SPOutput};
-use lbf::io::{read_bpp_instance, read_spp_instance};
+use lbf::io::output::{BPOutput, QPOutput, SPOutput};
+use lbf::io::{read_bpp_instance, read_qpp_instance, read_spp_instance};
 use lbf::opt::lbf_bpp::LBFOptimizerBP;
+use lbf::opt::lbf_qpp::LBFOptimizerQP;
 use lbf::opt::lbf_spp::LBFOptimizerSP;
 use lbf::{EPOCH, io};
 use log::{info, warn};
@@ -63,6 +65,15 @@ fn main() -> Result<()> {
         }
         ProblemVariant::StripPackingProblem => {
             let ext_sp_instance = read_spp_instance(args.input_file.as_path())?;
+            main_spp(
+                ext_sp_instance,
+                config,
+                input_file_stem,
+                args.solution_folder,
+            )
+        }
+        ProblemVariant::QuarePackingProblem => {
+            let ext_sp_instance = read_qpp_instance(args.input_file.as_path())?;
             main_spp(
                 ext_sp_instance,
                 config,
@@ -152,6 +163,47 @@ fn main_bpp(
 
             io::write_svg(&svg, Path::new(&svg_path))?;
         }
+    }
+
+    Ok(())
+}
+
+fn main_qpp(
+    ext_instance: ExtQPInstance,
+    config: LBFConfig,
+    input_stem: &str,
+    output_folder: PathBuf,
+) -> Result<()> {
+    let importer = Importer::new(
+        config.cde_config,
+        config.poly_simpl_tolerance,
+        config.min_item_separation,
+        config.narrow_concavity_cutoff_ratio,
+    );
+    let rng = match config.prng_seed {
+        Some(seed) => SmallRng::seed_from_u64(seed),
+        None => SmallRng::from_os_rng(),
+    };
+    let instance = qpp::io::import(&importer, &ext_instance)?;
+    let sol = LBFOptimizerQP::new(instance.clone(), config, rng).solve();
+
+    {
+        let output = QPOutput {
+            instance: ext_instance,
+            solution: qpp::io::export(&instance, &sol, *EPOCH),
+            config,
+        };
+
+        let solution_path = output_folder.join(format!("sol_{input_stem}.json"));
+
+        io::write_json(&output, Path::new(&solution_path))?;
+    }
+
+    {
+        let svg_path = output_folder.join(format!("sol_{input_stem}.svg"));
+        let svg = s_layout_to_svg(&sol.layout_snapshot, &instance, config.svg_draw_options, "");
+
+        io::write_svg(&svg, Path::new(&svg_path))?;
     }
 
     Ok(())
