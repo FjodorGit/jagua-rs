@@ -1,14 +1,14 @@
 use crate::entities::Item;
 use crate::geometry::shape_modification::ShapeModifyConfig;
 use crate::io::import::Importer;
-use crate::probs::spp::entities::{SPInstance, Strip};
-use crate::probs::spp::io::ext_repr::ExtSPInstance;
+use crate::probs::qpp::entities::{QPInstance, Square};
+use crate::probs::qpp::io::ext_repr::ExtQPInstance;
 use anyhow::{Result, ensure};
 use itertools::Itertools;
 use rayon::prelude::*;
 
 /// Imports an instance into the library
-pub fn import(importer: &Importer, ext_instance: &ExtSPInstance) -> Result<SPInstance> {
+pub fn import(importer: &Importer, ext_instance: &ExtQPInstance) -> Result<QPInstance> {
     let items: Vec<(Item, usize)> = {
         let mut items = ext_instance
             .items
@@ -41,21 +41,18 @@ pub fn import(importer: &Importer, ext_instance: &ExtSPInstance) -> Result<SPIns
         .map(|(item, demand)| item.area() * *demand as f32)
         .sum::<f32>();
 
-    let fixed_height = ext_instance.strip_height;
-
     // Initialize the base width for 100% density
-    let width = total_item_area / fixed_height;
+    let side_length = total_item_area.sqrt();
 
-    let base_strip = Strip::new(
-        fixed_height,
+    let base_square = Square::new(
         importer.cde_config,
         ShapeModifyConfig {
             offset: importer.shape_modify_config.offset,
             simplify_tolerance: None,
             narrow_concavity_cutoff_ratio: None,
         },
-        width,
+        side_length,
     )?;
 
-    Ok(SPInstance::new(items, base_strip))
+    Ok(QPInstance::new(items, base_square))
 }
