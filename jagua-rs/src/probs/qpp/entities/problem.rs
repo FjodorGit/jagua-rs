@@ -61,7 +61,7 @@ impl QPProblem {
         let fitted_width = item_x_max + self.square.shape_modify_config.offset.unwrap_or(0.0);
         let fitted_height = item_y_max + self.square.shape_modify_config.offset.unwrap_or(0.0);
 
-        self.change_square_side_length(fitted_width.min(fitted_height));
+        self.change_square_side_length(fitted_width.max(fitted_height));
         debug_assert!(feasible_before == self.layout.is_feasible());
     }
 
