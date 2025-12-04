@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use crate::Instant;
 use crate::entities::{Instance, Layout, PItemKey};
 use crate::geometry::DTransformation;
@@ -35,7 +37,7 @@ impl QPProblem {
     }
 
     /// Shrinks the strip to the minimum width that fits all items.
-    pub fn fit_strip(&mut self) {
+    pub fn fit_square(&mut self) {
         let feasible_before = self.layout.is_feasible();
 
         //Find the rightmost item in the strip and add some tolerance (avoiding false collision positives)

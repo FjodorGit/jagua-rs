@@ -5,6 +5,11 @@ use jagua_rs::probs::qpp::io::ext_repr::{ExtQPInstance, ExtQPSolution};
 use jagua_rs::probs::spp::io::ext_repr::{ExtSPInstance, ExtSPSolution};
 use serde::{Deserialize, Serialize};
 
+/// Scaling factor applied to input coordinates.
+/// Coordinates are scaled UP by this factor on import,
+/// and scaled DOWN by this factor on export to maintain precision.
+pub const COORDINATE_SCALE_FACTOR: f32 = 10_000.0;
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SPOutput {
     #[serde(flatten)]
@@ -49,11 +54,18 @@ pub fn layout_to_csv(layout: &ExtLayout) -> Vec<CSVPlacedItem> {
     layout
         .placed_items
         .iter()
-        .map(|pi| CSVPlacedItem {
-            item_id: pi.item_id,
-            reference_point_x: pi.transformation.translation.0,
-            reference_point_y: pi.transformation.translation.1,
-            rotation_degrees: pi.transformation.rotation.to_degrees(),
+        .map(|pi| {
+            // Apply reverse scaling to convert from internal scaled coordinates
+            // back to original coordinate space
+            let x_unscaled = pi.transformation.translation.0 / COORDINATE_SCALE_FACTOR;
+            let y_unscaled = pi.transformation.translation.1 / COORDINATE_SCALE_FACTOR;
+            
+            CSVPlacedItem {
+                item_id: pi.item_id,
+                reference_point_x: x_unscaled,
+                reference_point_y: y_unscaled,
+                rotation_degrees: pi.transformation.rotation.to_degrees(),
+            }
         })
         .collect()
 }

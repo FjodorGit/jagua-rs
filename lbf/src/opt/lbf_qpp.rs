@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use jagua_rs::Instant;
 use jagua_rs::probs::qpp::entities::{QPInstance, QPPlacement, QPProblem, QPSolution};
 
@@ -95,9 +97,9 @@ impl LBFOptimizerQP {
             }
         }
 
-        self.problem.fit_strip();
+        self.problem.fit_square();
         info!(
-            "[LBF] fitted strip width to {:.3}",
+            "[LBF] fitted square width to {:.3}",
             self.problem.square.side_length
         );
 
