@@ -9,8 +9,6 @@ pub struct ExtQPInstance {
     pub name: String,
     /// Set of items to be produced
     pub items: Vec<ExtItem>,
-    /// Fixed height of the strip
-    pub square_side: f32,
 }
 
 /// Item with a demand

@@ -1,9 +1,10 @@
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
 use crate::EPOCH;
+use crate::io::output::{CSVPlacedItem, CombinedCSVItem};
 use jagua_rs::probs::qpp::io::ext_repr::ExtQPInstance;
 use log::{Level, LevelFilter, info, log};
 use serde::Serialize;
@@ -31,7 +32,7 @@ pub fn read_bpp_instance(path: &Path) -> Result<ExtBPInstance> {
 pub fn read_qpp_instance(path: &Path) -> Result<ExtQPInstance> {
     let file = File::open(path).context("could not open instance file")?;
     serde_json::from_reader(BufReader::new(file))
-        .context("not a valid strip packing instance (ExtSPInstance)")
+        .context("not a valid square packing instance (ExtSPInstance)")
 }
 
 pub fn write_json(json: &impl Serialize, path: &Path) -> Result<()> {
@@ -55,6 +56,51 @@ pub fn write_svg(document: &Document, path: &Path) -> Result<()> {
             .expect("could not canonicalize path")
             .to_str()
             .unwrap()
+    );
+    Ok(())
+}
+
+pub fn write_csv(items: &[CSVPlacedItem], path: &Path) -> Result<()> {
+    let file = File::create(path)?;
+    let mut writer = BufWriter::new(file);
+
+    writeln!(
+        writer,
+        "item_id,reference_point_x,reference_point_y,rotation_degrees"
+    )?;
+
+    for item in items {
+        writeln!(
+            writer,
+            "{},{},{},{}",
+            item.item_id, item.reference_point_x, item.reference_point_y, item.rotation_degrees
+        )?;
+    }
+
+    writer.flush()?;
+
+    info!(
+        "Solution CSV written to file://{}",
+        fs::canonicalize(path)?.to_str().unwrap()
+    );
+    Ok(())
+}
+
+pub fn write_combined_csv(items: &[CombinedCSVItem], path: &Path) -> Result<()> {
+    let file = File::create(path)?;
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "id,x,y,deg")?;
+
+    for item in items {
+        writeln!(writer, "{},s{},s{},s{}", item.id, item.x, item.y, item.deg)?;
+    }
+
+    writer.flush()?;
+
+    info!(
+        "Combined solution CSV written to file://{}",
+        fs::canonicalize(path)?.to_str().unwrap()
     );
     Ok(())
 }

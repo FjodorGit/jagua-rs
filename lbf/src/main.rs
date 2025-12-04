@@ -13,7 +13,7 @@ use jagua_rs::probs::spp::io::ext_repr::ExtSPInstance;
 use jagua_rs::probs::{bpp, qpp, spp};
 use lbf::config::LBFConfig;
 use lbf::io::cli::{Cli, ProblemVariant};
-use lbf::io::output::{BPOutput, QPOutput, SPOutput};
+use lbf::io::output::{BPOutput, QPOutput, SPOutput, layout_to_csv};
 use lbf::io::{read_bpp_instance, read_qpp_instance, read_spp_instance};
 use lbf::opt::lbf_bpp::LBFOptimizerBP;
 use lbf::opt::lbf_qpp::LBFOptimizerQP;
@@ -73,9 +73,9 @@ fn main() -> Result<()> {
             )
         }
         ProblemVariant::QuarePackingProblem => {
-            let ext_sp_instance = read_qpp_instance(args.input_file.as_path())?;
-            main_spp(
-                ext_sp_instance,
+            let ext_qp_instance = read_qpp_instance(args.input_file.as_path())?;
+            main_qpp(
+                ext_qp_instance,
                 config,
                 input_file_stem,
                 args.solution_folder,
@@ -187,23 +187,27 @@ fn main_qpp(
     let instance = qpp::io::import(&importer, &ext_instance)?;
     let sol = LBFOptimizerQP::new(instance.clone(), config, rng).solve();
 
+    let output = QPOutput {
+        instance: ext_instance,
+        solution: qpp::io::export(&instance, &sol, *EPOCH),
+        config,
+    };
+
     {
-        let output = QPOutput {
-            instance: ext_instance,
-            solution: qpp::io::export(&instance, &sol, *EPOCH),
-            config,
-        };
-
         let solution_path = output_folder.join(format!("sol_{input_stem}.json"));
-
         io::write_json(&output, Path::new(&solution_path))?;
     }
 
     {
         let svg_path = output_folder.join(format!("sol_{input_stem}.svg"));
         let svg = s_layout_to_svg(&sol.layout_snapshot, &instance, config.svg_draw_options, "");
-
         io::write_svg(&svg, Path::new(&svg_path))?;
+    }
+
+    {
+        let csv_items = layout_to_csv(&output.solution.layout);
+        let csv_path = output_folder.join(format!("sol_{input_stem}.csv"));
+        io::write_csv(&csv_items, Path::new(&csv_path))?;
     }
 
     Ok(())

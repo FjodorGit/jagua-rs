@@ -1,0 +1,13 @@
+[package]
+name = "christmas-packing"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+lbf = { path = "../lbf" }
+jagua-rs = { path = "../jagua-rs" }
+rand = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+clap = { workspace = true }

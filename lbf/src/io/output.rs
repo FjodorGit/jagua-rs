@@ -1,4 +1,5 @@
 use crate::config::LBFConfig;
+use jagua_rs::io::ext_repr::ExtLayout;
 use jagua_rs::probs::bpp::io::ext_repr::{ExtBPInstance, ExtBPSolution};
 use jagua_rs::probs::qpp::io::ext_repr::{ExtQPInstance, ExtQPSolution};
 use jagua_rs::probs::spp::io::ext_repr::{ExtSPInstance, ExtSPSolution};
@@ -26,4 +27,33 @@ pub struct QPOutput {
     pub instance: ExtQPInstance,
     pub solution: ExtQPSolution,
     pub config: LBFConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CSVPlacedItem {
+    pub item_id: u64,
+    pub reference_point_x: f32,
+    pub reference_point_y: f32,
+    pub rotation_degrees: f32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CombinedCSVItem {
+    pub id: String,
+    pub x: f32,
+    pub y: f32,
+    pub deg: f32,
+}
+
+pub fn layout_to_csv(layout: &ExtLayout) -> Vec<CSVPlacedItem> {
+    layout
+        .placed_items
+        .iter()
+        .map(|pi| CSVPlacedItem {
+            item_id: pi.item_id,
+            reference_point_x: pi.transformation.translation.0,
+            reference_point_y: pi.transformation.translation.1,
+            rotation_degrees: pi.transformation.rotation.to_degrees(),
+        })
+        .collect()
 }
