@@ -78,7 +78,7 @@ impl Container {
     }
 
     /// The area of the contour of the container, excluding holes
-    pub fn area(&self) -> f32 {
+    pub fn area(&self) -> f64 {
         self.outer_orig.area() - self.quality_zones[0].as_ref().map_or(0.0, |qz| qz.area())
     }
 }
@@ -131,7 +131,7 @@ impl InferiorQualityZone {
         })
     }
 
-    pub fn area(&self) -> f32 {
+    pub fn area(&self) -> f64 {
         self.shapes_orig.iter().map(|shape| shape.area()).sum()
     }
 }

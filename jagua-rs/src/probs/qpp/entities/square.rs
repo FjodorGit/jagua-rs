@@ -10,14 +10,14 @@ use anyhow::{Result, ensure};
 pub struct Square {
     pub cde_config: CDEConfig,
     pub shape_modify_config: ShapeModifyConfig,
-    pub side_length: f32,
+    pub side_length: f64,
 }
 
 impl Square {
     pub fn new(
         cde_config: CDEConfig,
         shape_modify_config: ShapeModifyConfig,
-        side_length: f32,
+        side_length: f64,
     ) -> Result<Self> {
         ensure!(side_length > 0.0, "strip height must be positive");
         Ok(Self {
@@ -27,7 +27,7 @@ impl Square {
         })
     }
 
-    pub fn set_side_length(&mut self, side_length: f32) {
+    pub fn set_side_length(&mut self, side_length: f64) {
         assert!(side_length > 0.0, "strip width must be positive");
         self.side_length = side_length;
     }

@@ -27,9 +27,9 @@ pub struct SPolygon {
     /// Bounding box
     pub bbox: Rect,
     /// Area of its interior
-    pub area: f32,
+    pub area: f64,
     /// Maximum distance between any two points in the polygon
-    pub diameter: f32,
+    pub diameter: f64,
     /// [Pole of inaccessibility](https://en.wikipedia.org/wiki/Pole_of_inaccessibility) represented as a circle
     pub poi: Circle,
     /// Optional surrogate representation of the polygon (subset of the original)
@@ -104,7 +104,7 @@ impl SPolygon {
         self.surrogate.as_ref().expect("surrogate not generated")
     }
 
-    pub fn calculate_diameter(points: Vec<Point>) -> f32 {
+    pub fn calculate_diameter(points: Vec<Point>) -> f64 {
         //The two points furthest apart must be part of the convex hull
         let ch = convex_hull_from_points(points);
 
@@ -120,8 +120,8 @@ impl SPolygon {
     }
 
     pub fn generate_bounding_box(points: &[Point]) -> Rect {
-        let (mut x_min, mut y_min) = (f32::MAX, f32::MAX);
-        let (mut x_max, mut y_max) = (f32::MIN, f32::MIN);
+        let (mut x_min, mut y_min) = (f64::MAX, f64::MAX);
+        let (mut x_max, mut y_max) = (f64::MIN, f64::MIN);
 
         for point in points.iter() {
             x_min = x_min.min(point.0);
@@ -134,8 +134,8 @@ impl SPolygon {
 
     //https://en.wikipedia.org/wiki/Shoelace_formula
     //counterclockwise = positive area, clockwise = negative area
-    pub fn calculate_area(points: &[Point]) -> f32 {
-        let mut sigma: f32 = 0.0;
+    pub fn calculate_area(points: &[Point]) -> f64 {
+        let mut sigma: f64 = 0.0;
         for i in 0..points.len() {
             //next point
             let j = (i + 1) % points.len();
@@ -149,13 +149,13 @@ impl SPolygon {
         0.5 * sigma
     }
 
-    pub fn calculate_poi(points: &[Point], diameter: f32) -> Result<Circle> {
+    pub fn calculate_poi(points: &[Point], diameter: f64) -> Result<Circle> {
         //need to make a dummy simple polygon, because the pole generation algorithm
         //relies on many of the methods provided by the simple polygon struct
         let dummy_sp = {
             let bbox = SPolygon::generate_bounding_box(points);
             let area = SPolygon::calculate_area(points);
-            let dummy_poi = Circle::try_new(Point(f32::MAX, f32::MAX), f32::MAX).unwrap();
+            let dummy_poi = Circle::try_new(Point(f64::MAX, f64::MAX), f64::MAX).unwrap();
 
             SPolygon {
                 vertices: points.to_vec(),
@@ -292,10 +292,10 @@ impl CollidesWith<Point> for SPolygon {
 }
 
 impl DistanceTo<Point> for SPolygon {
-    fn distance_to(&self, point: &Point) -> f32 {
+    fn distance_to(&self, point: &Point) -> f64 {
         self.sq_distance_to(point).sqrt()
     }
-    fn sq_distance_to(&self, point: &Point) -> f32 {
+    fn sq_distance_to(&self, point: &Point) -> f64 {
         match self.collides_with(point) {
             true => 0.0,
             false => self
@@ -308,12 +308,12 @@ impl DistanceTo<Point> for SPolygon {
 }
 
 impl SeparationDistance<Point> for SPolygon {
-    fn separation_distance(&self, point: &Point) -> (GeoPosition, f32) {
+    fn separation_distance(&self, point: &Point) -> (GeoPosition, f64) {
         let (position, sq_distance) = self.sq_separation_distance(point);
         (position, sq_distance.sqrt())
     }
 
-    fn sq_separation_distance(&self, point: &Point) -> (GeoPosition, f32) {
+    fn sq_separation_distance(&self, point: &Point) -> (GeoPosition, f64) {
         let distance_to_closest_edge = self
             .edge_iter()
             .map(|edge| edge.sq_distance_to(point))

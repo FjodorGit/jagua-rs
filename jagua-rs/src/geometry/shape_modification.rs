@@ -28,16 +28,16 @@ pub struct ShapeModifyConfig {
     /// Maximum deviation of the simplified polygon with respect to the original polygon area as a ratio.
     /// If undefined, no simplification is performed.
     /// See [`simplify_shape`]
-    pub simplify_tolerance: Option<f32>,
+    pub simplify_tolerance: Option<f64>,
     /// Offset by which to inflate or deflate the polygon.
     /// If undefined, no offset is applied.
     /// See [`offset_shape`]
-    pub offset: Option<f32>,
+    pub offset: Option<f64>,
     /// Maximum distance between two vertices for which a concavity is considered narrow and can be closed.
     /// Defined as a fraction of the item's diameter.
     /// If undefined, no concavity closing is performed.
     /// See [`close_narrow_concavities`]
-    pub narrow_concavity_cutoff_ratio: Option<f32>,
+    pub narrow_concavity_cutoff_ratio: Option<f64>,
 }
 
 /// Simplifies a [`SPolygon`] by reducing the number of edges.
@@ -48,7 +48,7 @@ pub struct ShapeModifyConfig {
 pub fn simplify_shape(
     shape: &SPolygon,
     mode: ShapeModifyMode,
-    max_area_change_ratio: f32,
+    max_area_change_ratio: f64,
 ) -> SPolygon {
     let original_area = shape.area;
 
@@ -102,7 +102,7 @@ pub fn simplify_shape(
         let best_candidate = candidates
             .iter()
             .sorted_by_cached_key(|c| {
-                OrderedFloat(calculate_area_delta(&ref_points, c).unwrap_or(f32::INFINITY))
+                OrderedFloat(calculate_area_delta(&ref_points, c).unwrap_or(f64::INFINITY))
             })
             .find(|c| candidate_is_valid(&ref_points, c));
 
@@ -143,7 +143,7 @@ pub fn simplify_shape(
     simpl_shape
 }
 
-fn calculate_area_delta(shape: &[Point], candidate: &Candidate) -> Result<f32, InvalidCandidate> {
+fn calculate_area_delta(shape: &[Point], candidate: &Candidate) -> Result<f64, InvalidCandidate> {
     //calculate the difference in area of the shape if the candidate were to be executed
     let area = match candidate {
         Candidate::Collinear(_) => 0.0,
@@ -329,7 +329,7 @@ impl CornerType {
 
 /// Offsets a [`SPolygon`] by a certain `distance` either inwards or outwards depending on the [`ShapeModifyMode`].
 /// Relies on the [`geo_offset`](https://crates.io/crates/geo_offset) crate.
-pub fn offset_shape(sp: &SPolygon, mode: ShapeModifyMode, distance: f32) -> Result<SPolygon> {
+pub fn offset_shape(sp: &SPolygon, mode: ShapeModifyMode, distance: f64) -> Result<SPolygon> {
     let offset = match mode {
         ShapeModifyMode::Deflate => -distance,
         ShapeModifyMode::Inflate => distance,
@@ -363,7 +363,7 @@ pub fn offset_shape(sp: &SPolygon, mode: ShapeModifyMode, distance: f32) -> Resu
         geo_poly_offset
             .exterior()
             .points()
-            .map(|p| (p.x() as f32, p.y() as f32))
+            .map(|p| (p.x() as f64, p.y() as f64))
             .collect_vec(),
     );
 
@@ -374,7 +374,7 @@ pub fn offset_shape(sp: &SPolygon, mode: ShapeModifyMode, distance: f32) -> Resu
 pub fn close_narrow_concavities(
     orig_shape: &SPolygon,
     mode: ShapeModifyMode,
-    max_distance_ratio: f32,
+    max_distance_ratio: f64,
 ) -> SPolygon {
     let mut n_concav_closed = 0;
     let mut shape = orig_shape.clone();

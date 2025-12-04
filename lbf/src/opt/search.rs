@@ -33,7 +33,7 @@ pub fn search(
     let mut best: Option<(DTransformation, LBFLoss)> = None;
 
     //calculate the number of uniform and local search samples
-    let ls_sample_budget = (config.n_samples as f32 * config.ls_frac) as usize;
+    let ls_sample_budget = (config.n_samples as f64 * config.ls_frac) as usize;
     let uni_sample_budget = config.n_samples - ls_sample_budget;
 
     let mut bin_sampler = UniformRectSampler::new(cde.bbox(), item);
@@ -96,7 +96,7 @@ pub fn search(
                 (*best_sample, *best_cost) = (d_transf, cost);
             }
         }
-        let progress_pct = i as f32 / ls_sample_budget as f32;
+        let progress_pct = i as f64 / ls_sample_budget as f64;
         ls_sampler.decay_stddev(progress_pct);
     }
 

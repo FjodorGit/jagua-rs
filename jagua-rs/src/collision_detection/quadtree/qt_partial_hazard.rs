@@ -28,10 +28,10 @@ impl QTHazPartial {
             } else {
                 // Otherwise, calculate the bounding box from the edges
                 let (mut x_min, mut y_min, mut x_max, mut y_max) = (
-                    f32::INFINITY,
-                    f32::INFINITY,
-                    f32::NEG_INFINITY,
-                    f32::NEG_INFINITY,
+                    f64::INFINITY,
+                    f64::INFINITY,
+                    f64::NEG_INFINITY,
+                    f64::NEG_INFINITY,
                 );
                 for edge in &restricted_edges {
                     x_min = x_min.min(edge.start.x()).min(edge.end.x());

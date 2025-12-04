@@ -71,10 +71,10 @@ pub fn write_csv(items: &[CSVPlacedItem], path: &Path) -> Result<()> {
 
     for item in items {
         // Use high precision formatting to avoid loss of precision
-        // f32 has ~7 decimal digits of precision, so we use .10 to be safe
+        // f64 has ~15 decimal digits of precision, so we use .15 to preserve all precision
         writeln!(
             writer,
-            "{},{:.10},{:.10},{:.10}",
+            "{},{:.15},{:.15},{:.15}",
             item.item_id, item.reference_point_x, item.reference_point_y, item.rotation_degrees
         )?;
     }
@@ -96,9 +96,9 @@ pub fn write_combined_csv(items: &[CombinedCSVItem], path: &Path) -> Result<()> 
 
     for item in items {
         // Use high precision formatting to avoid loss of precision
-        // f32 has ~7 decimal digits of precision, so we use .10 to be safe
+        // f64 has ~15 decimal digits of precision, so we use .15 to preserve all precision
         // Note: 's' prefix is intentional for this format
-        writeln!(writer, "{},s{:.10},s{:.10},s{:.10}", item.id, item.x, item.y, item.deg)?;
+        writeln!(writer, "{},s{:.15},s{:.15},s{:.15}", item.id, item.x, item.y, item.deg)?;
     }
 
     writer.flush()?;

@@ -13,10 +13,10 @@ pub struct QPSolution {
 }
 
 impl QPSolution {
-    pub fn density(&self, instance: &QPInstance) -> f32 {
+    pub fn density(&self, instance: &QPInstance) -> f64 {
         self.layout_snapshot.density(instance)
     }
-    pub fn square_side_length(&self) -> f32 {
+    pub fn square_side_length(&self) -> f64 {
         self.square.side_length
     }
 }

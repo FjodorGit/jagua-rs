@@ -3,28 +3,28 @@ use rand::prelude::Distribution;
 use rand::prelude::IndexedRandom;
 use rand_distr::Normal;
 use rand_distr::Uniform;
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 
 use jagua_rs::entities::Item;
 use jagua_rs::geometry::geo_enums::RotationRange;
 
 /// Samples a rotation (radians).
 pub trait RotationSampler {
-    fn sample(&self, rng: &mut impl Rng) -> f32;
+    fn sample(&self, rng: &mut impl Rng) -> f64;
 }
 
 /// Samples a rotation from a uniform distribution over a given range or a discrete set of rotations.
 pub enum UniformRotDistr {
-    Range(Uniform<f32>),
-    Discrete(Vec<f32>),
+    Range(Uniform<f64>),
+    Discrete(Vec<f64>),
     None,
 }
 
 /// Samples a rotation from a normal distribution over a given range or a discrete set of rotations.
 /// In case of discrete rotations the mean is always returned.
 pub enum NormalRotDistr {
-    Range(Normal<f32>),
-    Discrete(f32),
+    Range(Normal<f64>),
+    Discrete(f64),
     None,
 }
 
@@ -39,7 +39,7 @@ impl UniformRotDistr {
         }
     }
 
-    pub fn sample(&self, rng: &mut impl Rng) -> f32 {
+    pub fn sample(&self, rng: &mut impl Rng) -> f64 {
         match self {
             UniformRotDistr::None => 0.0,
             UniformRotDistr::Range(u) => u.sample(rng),
@@ -49,7 +49,7 @@ impl UniformRotDistr {
 }
 
 impl NormalRotDistr {
-    pub fn from_item(item: &Item, r_ref: f32, stddev: f32) -> Self {
+    pub fn from_item(item: &Item, r_ref: f64, stddev: f64) -> Self {
         match &item.allowed_rotation {
             RotationRange::None => NormalRotDistr::None,
             RotationRange::Continuous => NormalRotDistr::Range(Normal::new(r_ref, stddev).unwrap()),
@@ -57,7 +57,7 @@ impl NormalRotDistr {
         }
     }
 
-    pub fn set_mean(&mut self, mean: f32) {
+    pub fn set_mean(&mut self, mean: f64) {
         match self {
             NormalRotDistr::Range(n) => {
                 *n = Normal::new(mean, n.std_dev()).unwrap();
@@ -66,7 +66,7 @@ impl NormalRotDistr {
         }
     }
 
-    pub fn set_stddev(&mut self, stddev: f32) {
+    pub fn set_stddev(&mut self, stddev: f64) {
         match self {
             NormalRotDistr::Range(n) => {
                 *n = Normal::new(n.mean(), stddev).unwrap();
@@ -75,7 +75,7 @@ impl NormalRotDistr {
         }
     }
 
-    pub fn sample(&self, rng: &mut impl Rng) -> f32 {
+    pub fn sample(&self, rng: &mut impl Rng) -> f64 {
         match self {
             NormalRotDistr::None => 0.0,
             NormalRotDistr::Range(n) => n.sample(rng),

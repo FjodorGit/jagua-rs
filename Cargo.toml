@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["christmas-packing", "jagua-rs", "lbf"]
+members = ["christmas-packing", "sparrow", "jagua-rs", "lbf"]
 
 [workspace.dependencies]
 ndarray = "0.17"

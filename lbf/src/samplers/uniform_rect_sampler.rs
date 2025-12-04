@@ -9,8 +9,8 @@ use rand_distr::Uniform;
 /// Samples a [`DTransformation`] uniformly at random in a given [`Rect`] and [`UniformRotDistr`].
 pub struct UniformRectSampler {
     pub bbox: Rect,
-    pub uniform_x: Uniform<f32>,
-    pub uniform_y: Uniform<f32>,
+    pub uniform_x: Uniform<f64>,
+    pub uniform_y: Uniform<f64>,
     pub uniform_r: UniformRotDistr,
 }
 

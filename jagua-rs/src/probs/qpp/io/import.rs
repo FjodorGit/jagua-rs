@@ -38,8 +38,8 @@ pub fn import(importer: &Importer, ext_instance: &ExtQPInstance) -> Result<QPIns
 
     let total_item_area = items
         .iter()
-        .map(|(item, demand)| item.area() * *demand as f32)
-        .sum::<f32>();
+        .map(|(item, demand)| item.area() * *demand as f64)
+        .sum::<f64>();
 
     // Initialize the base width for 100% density
     let side_length = total_item_area.sqrt();

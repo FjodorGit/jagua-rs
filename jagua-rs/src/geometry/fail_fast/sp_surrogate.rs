@@ -22,7 +22,7 @@ pub struct SPSurrogate {
     /// Indices of the vertices in the [`SPolygon`] that form the convex hull
     pub convex_hull_indices: Vec<usize>,
     /// The area of the convex hull of the [`SPolygon`].
-    pub convex_hull_area: f32,
+    pub convex_hull_area: f64,
     /// The configuration used to generate the surrogate
     pub config: SPSurrogateConfig,
 }
@@ -123,7 +123,7 @@ pub struct SPSurrogateConfig {
     ///While the coverage is below 75% the generation will stop at 100 poles.
     ///If 75% coverage with 20 or more poles the generation will stop.
     ///If 90% coverage with 10 or more poles the generation will stop.
-    pub n_pole_limits: [(usize, f32); N_POLE_LIMITS],
+    pub n_pole_limits: [(usize, f64); N_POLE_LIMITS],
     ///Number of poles to test during fail-fast
     pub n_ff_poles: usize,
     ///number of piers to test during fail-fast

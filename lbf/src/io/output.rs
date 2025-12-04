@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Scaling factor applied to input coordinates.
 /// Coordinates are scaled UP by this factor on import,
 /// and scaled DOWN by this factor on export to maintain precision.
-pub const COORDINATE_SCALE_FACTOR: f32 = 10_000.0;
+pub const COORDINATE_SCALE_FACTOR: f64 = 10_000.0;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SPOutput {
@@ -37,17 +37,17 @@ pub struct QPOutput {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CSVPlacedItem {
     pub item_id: u64,
-    pub reference_point_x: f32,
-    pub reference_point_y: f32,
-    pub rotation_degrees: f32,
+    pub reference_point_x: f64,
+    pub reference_point_y: f64,
+    pub rotation_degrees: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CombinedCSVItem {
     pub id: String,
-    pub x: f32,
-    pub y: f32,
-    pub deg: f32,
+    pub x: f64,
+    pub y: f64,
+    pub deg: f64,
 }
 
 pub fn layout_to_csv(layout: &ExtLayout) -> Vec<CSVPlacedItem> {

@@ -30,9 +30,9 @@ impl Importer {
     /// * `narrow_concavity_cutoff_ratio` - Optional maximum distance for closing narrow concavities. If enabled, the shapes are modified to close narrow concavities that are smaller than this value. See [`ShapeModifyConfig`].
     pub fn new(
         cde_config: CDEConfig,
-        simplify_tolerance: Option<f32>,
-        min_item_separation: Option<f32>,
-        narrow_concavity_cutoff_ratio: Option<f32>,
+        simplify_tolerance: Option<f64>,
+        min_item_separation: Option<f64>,
+        narrow_concavity_cutoff_ratio: Option<f64>,
     ) -> Importer {
         Importer {
             shape_modify_config: ShapeModifyConfig {
@@ -240,7 +240,7 @@ pub fn eliminate_degenerate_vertices(points: &mut Vec<Point>) {
         let j = (i + 1) % n_points;
         let p_i = points[i];
         let p_j = points[j];
-        if approx_eq!(f32, p_i.0, p_j.0) && approx_eq!(f32, p_i.1, p_j.1) {
+        if approx_eq!(f64, p_i.0, p_j.0) && approx_eq!(f64, p_i.1, p_j.1) {
             //points are equal, mark for removal
             indices_to_remove.push(i);
         }

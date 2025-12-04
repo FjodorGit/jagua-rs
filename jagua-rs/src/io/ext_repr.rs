@@ -9,7 +9,7 @@ pub struct ExtItem {
     /// List of allowed orientations angles (in degrees).
     /// Continuous rotation if not specified
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub allowed_orientations: Option<Vec<f32>>,
+    pub allowed_orientations: Option<Vec<f64>>,
     /// Shape of the item
     pub shape: ExtShape,
     /// The minimum required quality of the item.
@@ -37,10 +37,10 @@ pub struct ExtContainer {
 pub enum ExtShape {
     /// Axis-aligned rectangle. With its left bottom corner at (x_min, y_min), a width and height
     Rectangle {
-        x_min: f32,
-        y_min: f32,
-        width: f32,
-        height: f32,
+        x_min: f64,
+        y_min: f64,
+        width: f64,
+        height: f64,
     },
     /// Polygon with a single outer boundary
     SimplePolygon(ExtSPolygon),
@@ -63,7 +63,7 @@ pub struct ExtPolygon {
 /// External representation of a [`SPolygon`](crate::geometry::primitives::SPolygon).
 /// A polygon with no holes and no self-intersections.
 #[derive(Serialize, Deserialize, Clone)]
-pub struct ExtSPolygon(pub Vec<(f32, f32)>);
+pub struct ExtSPolygon(pub Vec<(f64, f64)>);
 
 /// A zone with a specific quality level
 #[derive(Serialize, Deserialize, Clone)]
@@ -83,7 +83,7 @@ pub struct ExtLayout {
     /// The items placed in the container and where they were placed
     pub placed_items: Vec<ExtPlacedItem>,
     /// Some statistics about the layout
-    pub density: f32,
+    pub density: f64,
 }
 
 /// External representation of a [`PlacedItem`](crate::entities::PlacedItem).
@@ -100,9 +100,9 @@ pub struct ExtPlacedItem {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ExtTransformation {
     /// The rotation angle in radians
-    pub rotation: f32,
+    pub rotation: f64,
     /// The translation vector (x, y)
-    pub translation: (f32, f32),
+    pub translation: (f64, f64),
 }
 
 impl From<DTransformation> for ExtTransformation {

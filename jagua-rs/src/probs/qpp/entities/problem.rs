@@ -31,7 +31,7 @@ impl QPProblem {
     }
 
     /// Modifies the width of the strip in the back, keeping the front fixed.
-    pub fn change_square_side_length(&mut self, new_width: f32) {
+    pub fn change_square_side_length(&mut self, new_width: f64) {
         self.square.set_side_length(new_width);
         self.layout.swap_container(self.square.into());
     }
@@ -134,11 +134,11 @@ impl QPProblem {
         self.item_demand_qtys[item_id] += 1;
     }
 
-    pub fn density(&self) -> f32 {
+    pub fn density(&self) -> f64 {
         self.layout.density(&self.instance)
     }
 
-    pub fn strip_width(&self) -> f32 {
+    pub fn strip_width(&self) -> f64 {
         self.square.side_length
     }
 }
