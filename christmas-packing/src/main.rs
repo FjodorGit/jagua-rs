@@ -28,9 +28,11 @@ use crate::ncnfp::christmas_tree;
 fn main() -> Result<()> {
     // Reference point of trees is the origin (0,0)
     // Get the tree shape (scaled and rotated)
-    let tree1 = christmas_tree(0.);
-    let tree2 = christmas_tree(180.);
-    let nfps = ncnfp::christmas_tree_nfps(180.);
+    let deg1 = 240.;
+    let deg2 = 60.;
+    let tree1 = christmas_tree(deg1);
+    let tree2 = christmas_tree(deg2);
+    let nfps = ncnfp::christmas_tree_nfps(deg1, deg2);
     let mut model = Model::new("2_christmas_trees")?;
 
     // Piece geometry parameters (distances from reference point to piece boundaries)
@@ -229,6 +231,9 @@ fn main() -> Result<()> {
             c!(all_region_vars.iter().grb_sum() == 1),
         )?;
     }
+    model.add_constr(&format!("symmetry_breaking"), c!(y1 <= y2))?;
+
+    // Symmetry breaking
 
     // Objective function (17): minimize square side length
     model.set_objective(s, Minimize)?;

@@ -24,3 +24,4 @@ Cargo.lock
 input/
 output/
 christmas-packing/gurobi.log
+christmas-packing/model.lp

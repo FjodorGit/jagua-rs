@@ -68,24 +68,19 @@ pub fn christmas_tree(deg: f64) -> Vec<Point> {
     rotate(&scale(&FULL_TREE), deg)
 }
 
-pub fn christmas_tree_nfps(deg: f64) -> Vec<Vec<Point>> {
-    let rot_scaled_top = rotate(&scale(&TOP_TIER), deg);
-    let rot_scaled_middle = rotate(&scale(&MID_TIER), deg);
-    let rot_scaled_low = rotate(&scale(&LOW_TIER), deg);
-    let rot_scaled_trunk = rotate(&scale(&TRUNK), deg);
+pub fn christmas_tree_nfps(deg1: f64, deg2: f64) -> Vec<Vec<Point>> {
+    let tree1_top = rotate(&scale(&TOP_TIER), deg1);
+    let tree1_middle = rotate(&scale(&MID_TIER), deg1);
+    let tree1_low = rotate(&scale(&LOW_TIER), deg1);
+    let tree1_trunk = rotate(&scale(&TRUNK), deg1);
 
-    let scaled_top = scale(&TOP_TIER);
-    let scaled_middle = scale(&MID_TIER);
-    let scaled_low = scale(&LOW_TIER);
-    let scaled_trunk = scale(&TRUNK);
+    let tree2_top = rotate(&scale(&TOP_TIER), deg2);
+    let tree2_middle = rotate(&scale(&MID_TIER), deg2);
+    let tree2_low = rotate(&scale(&LOW_TIER), deg2);
+    let tree2_trunk = rotate(&scale(&TRUNK), deg2);
 
-    let convex_decomp = [scaled_top, scaled_middle, scaled_low, scaled_trunk];
-    let rot_convex_decomp = [
-        rot_scaled_top,
-        rot_scaled_middle,
-        rot_scaled_low,
-        rot_scaled_trunk,
-    ];
+    let convex_decomp_1 = [tree1_top, tree1_middle, tree1_low, tree1_trunk];
+    let convex_decomp_2 = [tree2_top, tree2_middle, tree2_low, tree2_trunk];
 
     let names = ["top", "middle", "low", "trunk"];
 
@@ -94,9 +89,9 @@ pub fn christmas_tree_nfps(deg: f64) -> Vec<Vec<Point>> {
     let mut all_nfps = Vec::new();
     let mut pair_idx = 0;
     let mut polygons = vec![];
-    for (i, poly_a) in rot_convex_decomp.iter().enumerate() {
-        for (j, poly_b) in convex_decomp.iter().enumerate() {
-            let mut nfp = NFPConvex::nfp(poly_b, poly_a).unwrap();
+    for (i, poly_a) in convex_decomp_1.iter().enumerate() {
+        for (j, poly_b) in convex_decomp_2.iter().enumerate() {
+            let mut nfp = NFPConvex::nfp(poly_a, poly_b).unwrap();
             let point_tuples = nfp.iter().map(|p| (p.x, p.y)).collect::<Vec<(f64, f64)>>();
             let linestring: LineString<f64> = point_tuples.into();
             let polygon = Polygon::new(linestring, vec![]);
@@ -114,7 +109,7 @@ pub fn christmas_tree_nfps(deg: f64) -> Vec<Vec<Point>> {
         .pop()
         .expect("should have a polygon");
 
-    write_all_nfps_svg(&polygon_union, &convex_decomp, "output/all_nfps.svg");
+    write_all_nfps_svg(&polygon_union, &convex_decomp_1, "output/all_nfps.svg");
 
     all_nfps
 }
