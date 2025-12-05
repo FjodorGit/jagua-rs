@@ -1,5 +1,5 @@
 use jagua_rs::Instant;
-use jagua_rs::probs::spp::entities::{SPInstance, SPSolution};
+use jagua_rs::probs::qpp::entities::{QPInstance, QPSolution};
 use log::info;
 use rand::Rng;
 use crate::config::{CompressionConfig, ShrinkDecayStrategy};
@@ -9,13 +9,13 @@ use crate::util::terminator::Terminator;
 
 /// Algorithm 13 from https://doi.org/10.48550/arXiv.2509.13329
 pub fn compression_phase(
-    instance: &SPInstance, 
+    instance: &QPInstance, 
     sep: &mut Separator, 
-    init: &SPSolution,
+    init: &QPSolution,
     sol_listener: &mut impl SolutionListener, 
     term: &impl Terminator,
     config: &CompressionConfig
-) -> SPSolution {
+) -> QPSolution {
     let mut best = init.clone();
     let start = Instant::now();
     let mut n_failed_attempts = 0;
@@ -36,7 +36,7 @@ pub fn compression_phase(
     while !term.kill() && let step = shrink_step_size(n_failed_attempts) && step >= config.shrink_range.1 {
         match attempt_to_compress(sep, &best, step, term, sol_listener) {
             Some(compacted_sol) => {
-                info!("[CMPR] success at {:.3}% ({:.3} | {:.3}%)", step * 100.0, compacted_sol.strip_width(), compacted_sol.density(instance) * 100.0);
+                info!("[CMPR] success at {:.3}% ({:.3} | {:.3}%)", step * 100.0, compacted_sol.square_side_length(), compacted_sol.density(instance) * 100.0);
                 sol_listener.report(ReportType::CmprFeas, &compacted_sol, instance);
                 best = compacted_sol;
             }
@@ -51,15 +51,14 @@ pub fn compression_phase(
 }
 
 
-fn attempt_to_compress(sep: &mut Separator, init: &SPSolution, r_shrink: f64, term: &impl Terminator, sol_listener: &mut impl SolutionListener) -> Option<SPSolution> {
+fn attempt_to_compress(sep: &mut Separator, init: &QPSolution, r_shrink: f64, term: &impl Terminator, sol_listener: &mut impl SolutionListener) -> Option<QPSolution> {
     //restore to the initial solution and width
-    sep.change_strip_width(init.strip_width(), None);
+    sep.change_square_side_length(init.square_side_length());
     sep.rollback(&init, None);
 
-    //shrink the container at a random position
-    let new_width = init.strip_width() * (1.0 - r_shrink);
-    let split_pos = sep.rng.random_range(0.0..sep.prob.strip_width());
-    sep.change_strip_width(new_width, Some(split_pos));
+    //shrink the container uniformly
+    let new_width = init.square_side_length() * (1.0 - r_shrink);
+    sep.change_square_side_length(new_width);
 
     //try to separate layout, if all collisions are eliminated, return the solution
     let (compacted_sol, ot) = sep.separate(term, sol_listener);

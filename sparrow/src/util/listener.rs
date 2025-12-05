@@ -1,8 +1,8 @@
-use jagua_rs::probs::spp::entities::{SPInstance, SPSolution};
+use jagua_rs::probs::qpp::entities::{QPInstance, QPSolution};
 
 /// Trait for listeners that can receive solutions during the optimization process
 pub trait SolutionListener {
-    fn report(&mut self, report: ReportType, solution: &SPSolution, instance: &SPInstance);
+    fn report(&mut self, report: ReportType, solution: &QPSolution, instance: &QPInstance);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub enum ReportType {
 pub struct DummySolListener;
 
 impl SolutionListener for DummySolListener {
-    fn report(&mut self, _report: ReportType, _solution: &SPSolution, _instance: &SPInstance) {
+    fn report(&mut self, _report: ReportType, _solution: &QPSolution, _instance: &QPInstance) {
         // Do nothing
     }
 }

@@ -138,7 +138,7 @@ impl QPProblem {
         self.layout.density(&self.instance)
     }
 
-    pub fn strip_width(&self) -> f64 {
+    pub fn side_length(&self) -> f64 {
         self.square.side_length
     }
 }

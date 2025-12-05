@@ -8,7 +8,7 @@ use sparrow::EPOCH;
 use sparrow::config::*;
 use sparrow::optimizer::optimize;
 use sparrow::util::io;
-use sparrow::util::io::{MainCli, SPOutput};
+use sparrow::util::io::{MainCli, QPOutput};
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
 
     info!("[MAIN] system time: {}", jiff::Timestamp::now());
 
-    let ext_instance = io::read_spp_instance_json(Path::new(&input_file_path))?;
+    let ext_instance = io::read_qpp_instance_json(Path::new(&input_file_path))?;
 
     let importer = Importer::new(
         config.cde_config,
@@ -93,7 +93,7 @@ fn main() -> Result<()> {
         config.min_item_separation,
         config.narrow_concavity_cutoff_ratio,
     );
-    let instance = jagua_rs::probs::spp::io::import(&importer, &ext_instance)?;
+    let instance = jagua_rs::probs::qpp::io::import(&importer, &ext_instance)?;
 
     info!(
         "[MAIN] loaded instance {} with #{} items",
@@ -129,9 +129,9 @@ fn main() -> Result<()> {
     );
 
     let json_path = format!("{OUTPUT_DIR}/final_{}.json", ext_instance.name);
-    let json_output = SPOutput {
+    let json_output = QPOutput {
         instance: ext_instance,
-        solution: jagua_rs::probs::spp::io::export(&instance, &solution, *EPOCH),
+        solution: jagua_rs::probs::qpp::io::export(&instance, &solution, *EPOCH),
     };
     io::write_json(&json_output, Path::new(json_path.as_str()), Level::Info)?;
 

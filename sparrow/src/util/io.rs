@@ -1,14 +1,15 @@
-use log::{log, Level, LevelFilter};
+use crate::EPOCH;
+use anyhow::{Context, Result};
+use clap::Parser;
+use jagua_rs::probs::qpp::io::ext_repr::{ExtQPInstance, ExtQPSolution};
+use jagua_rs::probs::spp::io::ext_repr::ExtSPInstance;
+use log::{Level, LevelFilter, log};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 use svg::Document;
-use anyhow::{Context, Result};
-use clap::Parser;
-use jagua_rs::probs::spp::io::ext_repr::{ExtSPInstance, ExtSPSolution};
-use crate::EPOCH;
 
 #[derive(Parser)]
 pub struct MainCli {
@@ -21,15 +22,29 @@ pub struct MainCli {
     pub global_time: Option<u64>,
 
     /// Exploration time limit in seconds (requires compression time)
-    #[arg(short = 'e', long, requires = "compression", help = "Set the exploration phase time limit (in seconds)")]
+    #[arg(
+        short = 'e',
+        long,
+        requires = "compression",
+        help = "Set the exploration phase time limit (in seconds)"
+    )]
     pub exploration: Option<u64>,
 
     /// Compression time limit in seconds (requires exploration time)
-    #[arg(short = 'c', long, requires = "exploration", help = "Set the compression phase time limit (in seconds)")]
+    #[arg(
+        short = 'c',
+        long,
+        requires = "exploration",
+        help = "Set the compression phase time limit (in seconds)"
+    )]
     pub compression: Option<u64>,
 
     /// Enable early and automatic termination
-    #[arg(short = 'x', long, help = "Enable early termination of the optimization process")]
+    #[arg(
+        short = 'x',
+        long,
+        help = "Enable early termination of the optimization process"
+    )]
     pub early_termination: bool,
 
     #[arg(short = 's', long, help = "Fixed seed for the random number generator")]
@@ -37,10 +52,10 @@ pub struct MainCli {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct SPOutput {
+pub struct QPOutput {
     #[serde(flatten)]
-    pub instance: ExtSPInstance,
-    pub solution: ExtSPSolution,
+    pub instance: ExtQPInstance,
+    pub solution: ExtQPSolution,
 }
 
 pub fn init_logger(level_filter: LevelFilter, log_file_path: &Path) -> Result<()> {
@@ -81,14 +96,14 @@ pub fn init_logger(level_filter: LevelFilter, log_file_path: &Path) -> Result<()
     Ok(())
 }
 
-
 pub fn write_svg(document: &Document, path: &Path, log_lvl: Level) -> Result<()> {
     //make sure the parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).context("could not create parent directory for svg file")?;
     }
     svg::save(path, document)?;
-    log!(log_lvl,
+    log!(
+        log_lvl,
         "[IO] svg exported to file://{}",
         fs::canonicalize(&path)
             .expect("could not canonicalize path")
@@ -101,7 +116,8 @@ pub fn write_svg(document: &Document, path: &Path, log_lvl: Level) -> Result<()>
 pub fn write_json(json: &impl Serialize, path: &Path, log_lvl: Level) -> Result<()> {
     let file = File::create(path)?;
     serde_json::to_writer_pretty(file, json)?;
-    log!(log_lvl,
+    log!(
+        log_lvl,
         "[IO] json exported to file://{}",
         fs::canonicalize(&path)
             .expect("could not canonicalize path")
@@ -112,6 +128,12 @@ pub fn write_json(json: &impl Serialize, path: &Path, log_lvl: Level) -> Result<
 }
 
 pub fn read_spp_instance_json(path: &Path) -> Result<ExtSPInstance> {
+    let file = File::open(path).context("could not open instance file")?;
+    serde_json::from_reader(BufReader::new(file))
+        .context("not a valid strip packing instance (ExtSPInstance)")
+}
+
+pub fn read_qpp_instance_json(path: &Path) -> Result<ExtQPInstance> {
     let file = File::open(path).context("could not open instance file")?;
     serde_json::from_reader(BufReader::new(file))
         .context("not a valid strip packing instance (ExtSPInstance)")

@@ -11,3 +11,6 @@ rand = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
 clap = { workspace = true }
+geo = "0.31.0"
+nfp = "0.3.3"
+grb = { version = "3.0.1", features = ["gurobi12"] }

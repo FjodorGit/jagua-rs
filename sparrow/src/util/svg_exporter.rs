@@ -1,6 +1,6 @@
 use std::path::Path;
 use jagua_rs::io::svg::s_layout_to_svg;
-use jagua_rs::probs::spp::entities::{SPInstance, SPSolution};
+use jagua_rs::probs::qpp::entities::{QPInstance, QPSolution};
 use log::Level;
 use crate::consts::DRAW_OPTIONS;
 use crate::util::io;
@@ -38,7 +38,7 @@ impl SvgExporter {
 }
 
 impl SolutionListener for SvgExporter{
-    fn report(&mut self, report_type: ReportType, solution: &SPSolution, instance: &SPInstance) {
+    fn report(&mut self, report_type: ReportType, solution: &QPSolution, instance: &QPInstance) {
         let suffix = match report_type {
             ReportType::CmprFeas => "cmpr",
             ReportType::ExplInfeas => "expl_nf",
@@ -46,7 +46,7 @@ impl SolutionListener for SvgExporter{
             ReportType::Final => "final",
             ReportType::ExplImproving => "expl_i"
         };
-        let file_name = format!("{}_{:.3}_{}", self.svg_counter, solution.strip_width(), suffix);
+        let file_name = format!("{}_{:.3}_{}", self.svg_counter, solution.square_side_length(), suffix);
         if let Some(live_path) = &self.live_path {
             let svg = s_layout_to_svg(&solution.layout_snapshot, instance, DRAW_OPTIONS, &file_name.as_str());
             io::write_svg(&svg, Path::new(live_path), Level::Trace).expect("failed to write live svg");

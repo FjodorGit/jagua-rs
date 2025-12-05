@@ -1,22 +1,22 @@
-use crate::optimizer::worker::{SepStats, SeparatorWorker};
+use crate::FMT;
 use crate::optimizer::Terminator;
+use crate::optimizer::worker::{SepStats, SeparatorWorker};
 use crate::quantify::tracker::{CTSnapshot, CollisionTracker};
 use crate::sample::search::SampleConfig;
 use crate::util::assertions::tracker_matches_layout;
-use crate::{FMT};
+use crate::util::listener::{ReportType, SolutionListener};
 use itertools::Itertools;
+use jagua_rs::Instant;
 use jagua_rs::entities::PItemKey;
-use jagua_rs::probs::spp::entities::{SPInstance, SPPlacement, SPProblem, SPSolution};
 use jagua_rs::geometry::DTransformation;
-use log::{debug, log, Level};
+use jagua_rs::probs::qpp::entities::{QPInstance, QPPlacement, QPProblem, QPSolution};
+use log::{Level, debug, log};
 use ordered_float::OrderedFloat;
 use rand::{Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
+use rayon::ThreadPool;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
-use rayon::ThreadPool;
-use jagua_rs::Instant;
-use rand_xoshiro::Xoshiro256PlusPlus;
-use crate::util::listener::{ReportType, SolutionListener};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SeparatorConfig {
@@ -28,9 +28,9 @@ pub struct SeparatorConfig {
 }
 
 pub struct Separator {
-    pub instance: SPInstance,
+    pub instance: QPInstance,
     pub rng: Xoshiro256PlusPlus,
-    pub prob: SPProblem,
+    pub prob: QPProblem,
     pub ct: CollisionTracker,
     pub workers: Vec<SeparatorWorker>,
     pub config: SeparatorConfig,
@@ -38,23 +38,34 @@ pub struct Separator {
 }
 
 impl Separator {
-    pub fn new(instance: SPInstance, prob: SPProblem, mut rng: Xoshiro256PlusPlus, config: SeparatorConfig) -> Self {
+    pub fn new(
+        instance: QPInstance,
+        prob: QPProblem,
+        mut rng: Xoshiro256PlusPlus,
+        config: SeparatorConfig,
+    ) -> Self {
         let ct = CollisionTracker::new(&prob.layout);
-        let workers = (0..config.n_workers).map(|_|
-            SeparatorWorker {
+        let workers = (0..config.n_workers)
+            .map(|_| SeparatorWorker {
                 instance: instance.clone(),
                 prob: prob.clone(),
                 ct: ct.clone(),
                 rng: Xoshiro256PlusPlus::seed_from_u64(rng.random()),
                 sample_config: config.sample_config.clone(),
-            }).collect();
+            })
+            .collect();
 
         let pool = if cfg!(target_arch = "wasm32") {
             // On wasm32, only the global thread pool is available
             None
         } else {
             // Create a local thread pool to keep using the same threads for the same optimization (helps the OS scheduler)
-            Some(rayon::ThreadPoolBuilder::new().num_threads(config.n_workers).build().unwrap())
+            Some(
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(config.n_workers)
+                    .build()
+                    .unwrap(),
+            )
         };
 
         Self {
@@ -69,45 +80,79 @@ impl Separator {
     }
 
     /// Algorithm 9 from https://doi.org/10.48550/arXiv.2509.13329
-    pub fn separate(&mut self, term: &impl Terminator, sol_listener: &mut impl SolutionListener) -> (SPSolution, CTSnapshot) {
+    pub fn separate(
+        &mut self,
+        term: &impl Terminator,
+        sol_listener: &mut impl SolutionListener,
+    ) -> (QPSolution, CTSnapshot) {
         let mut min_loss_sol = (self.prob.save(), self.ct.save());
         let mut min_loss = self.ct.get_total_loss();
-        log!(self.config.log_level,"[SEP] separating at width: {:.3} and loss: {} ", self.prob.strip_width(), FMT().fmt2(min_loss));
+        log!(
+            self.config.log_level,
+            "[SEP] separating at width: {:.3} and loss: {} ",
+            self.prob.side_length(),
+            FMT().fmt2(min_loss)
+        );
 
         let mut n_strikes = 0;
         let mut n_iter = 0;
-        let mut sep_stats = SepStats { total_moves: 0, total_evals: 0 };
+        let mut sep_stats = SepStats {
+            total_moves: 0,
+            total_evals: 0,
+        };
         let start = Instant::now();
 
         'outer: while n_strikes < self.config.strike_limit && !term.kill() {
             let mut n_iter_no_improvement = 0;
 
             let initial_strike_loss = self.ct.get_total_loss();
-            debug!("[SEP] [s:{n_strikes},i:{n_iter}]     init_l: {}",FMT().fmt2(initial_strike_loss));
+            debug!(
+                "[SEP] [s:{n_strikes},i:{n_iter}]     init_l: {}",
+                FMT().fmt2(initial_strike_loss)
+            );
 
             while n_iter_no_improvement < self.config.iter_no_imprv_limit {
-                let (loss_before, w_loss_before) = (
-                    self.ct.get_total_loss(),
-                    self.ct.get_total_weighted_loss(),
-                );
+                let (loss_before, w_loss_before) =
+                    (self.ct.get_total_loss(), self.ct.get_total_weighted_loss());
                 sep_stats += self.move_items_multi();
-                let (loss, w_loss) = (
-                    self.ct.get_total_loss(),
-                    self.ct.get_total_weighted_loss(),
-                );
+                let (loss, w_loss) = (self.ct.get_total_loss(), self.ct.get_total_weighted_loss());
 
-                debug!("[SEP] [s:{n_strikes},i:{n_iter}] ( ) l: {} -> {}, wl: {} -> {}, (min l: {})", FMT().fmt2(loss_before), FMT().fmt2(loss), FMT().fmt2(w_loss_before), FMT().fmt2(w_loss), FMT().fmt2(min_loss));
-                debug_assert!(w_loss <= w_loss_before * 1.001, "weighted loss should not increase: {} -> {}", FMT().fmt2(w_loss), FMT().fmt2(w_loss_before));
+                debug!(
+                    "[SEP] [s:{n_strikes},i:{n_iter}] ( ) l: {} -> {}, wl: {} -> {}, (min l: {})",
+                    FMT().fmt2(loss_before),
+                    FMT().fmt2(loss),
+                    FMT().fmt2(w_loss_before),
+                    FMT().fmt2(w_loss),
+                    FMT().fmt2(min_loss)
+                );
+                debug_assert!(
+                    w_loss <= w_loss_before * 1.001,
+                    "weighted loss should not increase: {} -> {}",
+                    FMT().fmt2(w_loss),
+                    FMT().fmt2(w_loss_before)
+                );
 
                 if loss == 0.0 {
                     //layout is successfully separated
-                    log!(self.config.log_level,"[SEP] [s:{n_strikes},i:{n_iter}] (S)  min_l: {}",FMT().fmt2(loss));
+                    log!(
+                        self.config.log_level,
+                        "[SEP] [s:{n_strikes},i:{n_iter}] (S)  min_l: {}",
+                        FMT().fmt2(loss)
+                    );
                     min_loss_sol = (self.prob.save(), self.ct.save());
                     break 'outer;
                 } else if loss < min_loss {
                     //layout is not separated, but absolute loss is better than before
-                    log!(self.config.log_level,"[SEP] [s:{n_strikes},i:{n_iter}] (*) min_l: {}",FMT().fmt2(loss));
-                    sol_listener.report(ReportType::ExplImproving, &self.prob.save(), &self.instance);
+                    log!(
+                        self.config.log_level,
+                        "[SEP] [s:{n_strikes},i:{n_iter}] (*) min_l: {}",
+                        FMT().fmt2(loss)
+                    );
+                    sol_listener.report(
+                        ReportType::ExplImproving,
+                        &self.prob.save(),
+                        &self.instance,
+                    );
                     if loss < min_loss * 0.98 {
                         //only reset the iter_no_improvement counter if the loss improved significantly
                         n_iter_no_improvement = 0;
@@ -130,8 +175,10 @@ impl Separator {
             self.rollback(&min_loss_sol.0, Some(&min_loss_sol.1));
         }
         let secs = start.elapsed().as_secs_f64();
-        log!(self.config.log_level, "[SEP] finished, evals/s: {} K, evals/move: {}, moves/s: {}, iter/s: {}, #workers: {}, total {:.3}s",
-            (sep_stats.total_evals as f64/ (1000.0 * secs)) as usize,
+        log!(
+            self.config.log_level,
+            "[SEP] finished, evals/s: {} K, evals/move: {}, moves/s: {}, iter/s: {}, #workers: {}, total {:.3}s",
+            (sep_stats.total_evals as f64 / (1000.0 * secs)) as usize,
             FMT().fmt2(sep_stats.total_evals as f64 / sep_stats.total_moves as f64),
             FMT().fmt2(sep_stats.total_moves as f64 / secs),
             FMT().fmt2(n_iter as f64 / secs),
@@ -147,12 +194,15 @@ impl Separator {
         let master_sol = self.prob.save();
 
         let mut separate_multi = || -> SepStats {
-            self.workers.par_iter_mut().map(|worker| {
-                // Sync the workers with the master
-                worker.load(&master_sol, &self.ct);
-                // Let them modify
-                worker.move_items()
-            }).sum()
+            self.workers
+                .par_iter_mut()
+                .map(|worker| {
+                    // Sync the workers with the master
+                    worker.load(&master_sol, &self.ct);
+                    // Let them modify
+                    worker.move_items()
+                })
+                .sum()
         };
 
         let sep_report = match self.thread_pool.as_mut() {
@@ -160,10 +210,18 @@ impl Separator {
             None => separate_multi(),
         };
 
-        debug!("[MOD] optimizers w_o's: {:?}",self.workers.iter().map(|opt| opt.ct.get_total_weighted_loss()).collect_vec());
+        debug!(
+            "[MOD] optimizers w_o's: {:?}",
+            self.workers
+                .iter()
+                .map(|opt| opt.ct.get_total_weighted_loss())
+                .collect_vec()
+        );
 
         // Check which worker has the lowest total weighted loss
-        let best_opt = self.workers.iter_mut()
+        let best_opt = self
+            .workers
+            .iter_mut()
             .min_by_key(|opt| OrderedFloat(opt.ct.get_total_weighted_loss()))
             .map(|opt| (opt.prob.save(), &opt.ct))
             .unwrap();
@@ -175,8 +233,8 @@ impl Separator {
         sep_report
     }
 
-    pub fn rollback(&mut self, sol: &SPSolution, ots: Option<&CTSnapshot>) {
-        debug_assert!(sol.strip_width() == self.prob.strip_width());
+    pub fn rollback(&mut self, sol: &QPSolution, ots: Option<&CTSnapshot>) {
+        debug_assert!(sol.square_side_length() == self.prob.side_length());
         self.prob.restore(sol);
 
         match ots {
@@ -203,39 +261,56 @@ impl Separator {
         self.prob.remove_item(pk);
 
         //Place the item again but with a new transformation
-        let new_pk = self.prob.place_item(SPPlacement{d_transf,item_id});
+        let new_pk = self.prob.place_item(QPPlacement { d_transf, item_id });
 
         self.ct.register_item_move(&self.prob.layout, pk, new_pk);
 
         let new_loss = self.ct.get_loss(new_pk);
         let new_weighted_loss = self.ct.get_weighted_loss(new_pk);
 
-        debug!("[MV] moved item {} from from l: {}, wl: {} to l+1: {}, wl+1: {}"
-            ,item_id,FMT().fmt2(old_loss),FMT().fmt2(old_weighted_loss),FMT().fmt2(new_loss),FMT().fmt2(new_weighted_loss));
+        debug!(
+            "[MV] moved item {} from from l: {}, wl: {} to l+1: {}, wl+1: {}",
+            item_id,
+            FMT().fmt2(old_loss),
+            FMT().fmt2(old_weighted_loss),
+            FMT().fmt2(new_loss),
+            FMT().fmt2(new_weighted_loss)
+        );
 
         debug_assert!(tracker_matches_layout(&self.ct, &self.prob.layout));
 
         new_pk
     }
 
-    pub fn change_strip_width(&mut self, new_width: f64, split_position: Option<f64>) {
-        //if no split position is provided, use the center of the strip
-        let split_position = split_position.unwrap_or(self.prob.strip_width() / 2.0);
-        let delta = new_width - self.prob.strip_width();
+    pub fn change_square_side_length(&mut self, new_side_length: f64) {
+        let old_side_length = self.prob.side_length();
+        let scale_factor = new_side_length / old_side_length;
 
-        //shift all items right of the split position
-        let items_to_shift = self.prob.layout.placed_items.iter()
-            .filter(|(_, pi)| pi.shape.centroid().0 > split_position)
-            .map(|(k, pi)| (k, pi.d_transf))
+        //scale all item positions proportionally from center
+        let center = old_side_length / 2.0;
+        let items_to_move = self
+            .prob
+            .layout
+            .placed_items
+            .iter()
+            .map(|(k, pi)| {
+                let centroid = pi.shape.centroid();
+                let (x, y) = (centroid.0, centroid.1);
+                let new_x = center + (x - center) * scale_factor;
+                let new_y = center + (y - center) * scale_factor;
+                let delta_x = new_x - x;
+                let delta_y = new_y - y;
+                (k, pi.d_transf, (delta_x, delta_y))
+            })
             .collect_vec();
 
-        for (pik, dtransf) in items_to_shift {
+        for (pik, dtransf, (delta_x, delta_y)) in items_to_move {
             let existing_transf = dtransf.compose();
-            let new_transf = existing_transf.translate((delta, 0.0));
+            let new_transf = existing_transf.translate((delta_x, delta_y));
             self.move_item(pik, new_transf.decompose());
         }
 
-        self.prob.change_strip_width(new_width);
+        self.prob.change_square_side_length(new_side_length);
 
         //rebuild the collision tracker
         self.ct = CollisionTracker::new(&self.prob.layout);
@@ -250,6 +325,6 @@ impl Separator {
                 sample_config: self.config.sample_config.clone(),
             };
         });
-        debug!("[SEP] changed strip width to {:.3}", new_width);
+        debug!("[SEP] changed square side length to {:.3}", new_side_length);
     }
 }

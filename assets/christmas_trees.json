@@ -3,13 +3,21 @@
   "items": [
     {
       "id": 0,
-      "demand": 100,
+      "demand": 30,
       "dxf": "dxf/i_0.dxf",
       "allowed_orientations": [
         0.0,
+        36.0,
+        72.0,
         90.0,
+        108.0,
+        144.0,
         180.0,
-        270.0
+        216.0,
+        252.0,
+        270.0,
+        288.0,
+        324.0
       ],
       "shape": {
         "type": "simple_polygon",
