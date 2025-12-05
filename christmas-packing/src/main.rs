@@ -26,10 +26,11 @@ use grb::prelude::*;
 use crate::ncnfp::christmas_tree;
 
 fn main() -> Result<()> {
+    // Reference point of trees is the origin (0,0)
     // Get the tree shape (scaled and rotated)
     let tree1 = christmas_tree(0.);
-    let tree2 = christmas_tree(90.);
-    let nfps = ncnfp::christmas_tree_nfps(0.);
+    let tree2 = christmas_tree(180.);
+    let nfps = ncnfp::christmas_tree_nfps(180.);
     let mut model = Model::new("2_christmas_trees")?;
 
     // Piece geometry parameters (distances from reference point to piece boundaries)
@@ -38,40 +39,85 @@ fn main() -> Result<()> {
         .iter()
         .map(|p| p.y)
         .min_by(|y_1, y_2| y_1.partial_cmp(y_2).unwrap())
-        .expect("should have a min value"); // distance from reference point to leftmost point
+        .expect("should have a min value")
+        .abs();
+    let h_1_max: f64 = tree1
+        .iter()
+        .map(|p| p.y)
+        .max_by(|y_1, y_2| y_1.partial_cmp(y_2).unwrap())
+        .expect("should have a max value")
+        .abs();
+    let l_1_min: f64 = tree1
+        .iter()
+        .map(|p| p.x)
+        .min_by(|x_1, x_2| x_1.partial_cmp(x_2).unwrap())
+        .expect("should have a min value")
+        .abs();
+    let l_1_max: f64 = tree1
+        .iter()
+        .map(|p| p.x)
+        .max_by(|x_1, x_2| x_1.partial_cmp(x_2).unwrap())
+        .expect("should have a max value")
+        .abs();
 
-    let h_1_max: f64 = 8000.0; // distance from reference point to rightmost point
-    let l_min: f64 = 3500.0; // distance from reference point to bottommost point
-    let l_max: f64 = 3500.0; // distance from reference point to topmost point
+    let h_2_min: f64 = tree2
+        .iter()
+        .map(|p| p.y)
+        .min_by(|y_1, y_2| y_1.partial_cmp(y_2).unwrap())
+        .expect("should have a min value")
+        .abs();
+    let h_2_max: f64 = tree2
+        .iter()
+        .map(|p| p.y)
+        .max_by(|y_1, y_2| y_1.partial_cmp(y_2).unwrap())
+        .expect("should have a max value")
+        .abs();
+    let l_2_min: f64 = tree2
+        .iter()
+        .map(|p| p.x)
+        .min_by(|x_1, x_2| x_1.partial_cmp(x_2).unwrap())
+        .expect("should have a min value")
+        .abs();
+    let l_2_max: f64 = tree2
+        .iter()
+        .map(|p| p.x)
+        .max_by(|x_1, x_2| x_1.partial_cmp(x_2).unwrap())
+        .expect("should have a max value")
+        .abs();
 
     // Compute bounds for s (the square side length)
-    let piece_width = l_min + l_max; // total width of piece
-    let piece_height = h_min + h_max; // total height of piece
+    let piece_1_width = l_1_min + l_1_max; // total width of piece
+    let piece_1_height = h_1_min + h_1_max; // total height of piece
+    let piece_2_width = l_2_min + l_2_max; // total width of piece
+    let piece_2_height = h_2_min + h_2_max; // total height of piece
 
     // Constraint (21): Lower bound for s
     // s >= max(largest_piece_dimension, total_area / s)
     // For a square, simplified to at least fit one piece
-    let s_lb = piece_width.max(piece_height);
+    let s_lb = piece_1_width
+        .max(piece_1_height)
+        .max(piece_2_width)
+        .max(piece_2_height);
 
     // Constraint (20): Upper bound for s
     // Worst case: pieces placed end to end
-    let s_ub = 2.0 * piece_width.max(piece_height);
+    let s_ub = 2.0 * s_lb;
 
     // Decision variables (30), (31), (32)
     // Constraint (18): l_min <= x_i <= s - l_max
-    let x1 = add_ctsvar!(model, name: "x1", bounds: l_min..)?;
-    let y1 = add_ctsvar!(model, name: "y1", bounds: h_min..)?;
-    let x2 = add_ctsvar!(model, name: "x2", bounds: l_min..)?;
-    let y2 = add_ctsvar!(model, name: "y2", bounds: h_min..)?;
+    let x1 = add_ctsvar!(model, name: "x1", bounds: l_1_min..)?;
+    let y1 = add_ctsvar!(model, name: "y1", bounds: h_1_min..)?;
+    let x2 = add_ctsvar!(model, name: "x2", bounds: l_2_min..)?;
+    let y2 = add_ctsvar!(model, name: "y2", bounds: h_2_min..)?;
     let s = add_ctsvar!(model, name: "s", bounds: s_lb..s_ub)?;
 
     // Constraints (18) upper bounds: x_i <= s - l_max
-    model.add_constr("bound_x1_upper", c!(x1 <= s - l_max))?;
-    model.add_constr("bound_x2_upper", c!(x2 <= s - l_max))?;
+    model.add_constr("bound_x1_upper", c!(x1 <= s - l_1_max))?;
+    model.add_constr("bound_x2_upper", c!(x2 <= s - l_2_max))?;
 
     // Constraints (19) upper bounds: y_i <= s - h_max (using s instead of H for square)
-    model.add_constr("bound_y1_upper", c!(y1 <= s - h_max))?;
-    model.add_constr("bound_y2_upper", c!(y2 <= s - h_max))?;
+    model.add_constr("bound_y1_upper", c!(y1 <= s - h_1_max))?;
+    model.add_constr("bound_y2_upper", c!(y2 <= s - h_2_max))?;
 
     // Process each NFP (for convex parts - with 2 convex pieces, there's typically 1 NFP)
     for (nfp_idx, nfp) in nfps.iter().enumerate() {
@@ -118,7 +164,7 @@ fn main() -> Result<()> {
 
                 // Constraint (24): left bound of vertical slice
                 // b.x + x_i - x_j <= (1 - v) * M'
-                let m_24 = b.x + s_ub - l_max - l_min;
+                let m_24 = b.x + s_ub - l_1_max - l_2_min;
                 model.add_constr(
                     &format!("top_left_{}_{}", nfp_idx, edge_idx),
                     c!(b.x + x1 - x2 <= (1.0 - v) * m_24),
@@ -126,7 +172,7 @@ fn main() -> Result<()> {
 
                 // Constraint (25): right bound of vertical slice
                 // x_j - x_i - a.x <= (1 - v) * M''
-                let m_25 = s_ub - l_max - l_min - a.x;
+                let m_25 = s_ub - l_2_max - l_1_min - a.x;
                 model.add_constr(
                     &format!("top_right_{}_{}", nfp_idx, edge_idx),
                     c!(x2 - x1 - a.x <= (1.0 - v) * m_25),
@@ -136,7 +182,7 @@ fn main() -> Result<()> {
 
                 // Constraint (26): left bound of vertical slice
                 // a.x + x_i - x_j <= (1 - v) * M_bar'
-                let m_26 = a.x + s_ub - l_max - l_min;
+                let m_26 = a.x + s_ub - l_1_max - l_2_min;
                 model.add_constr(
                     &format!("bottom_left_{}_{}", nfp_idx, edge_idx),
                     c!(a.x + x1 - x2 <= (1.0 - v) * m_26),
@@ -144,7 +190,7 @@ fn main() -> Result<()> {
 
                 // Constraint (27): right bound of vertical slice
                 // x_j - x_i - b.x <= (1 - v) * M_bar''
-                let m_27 = s_ub - l_max - l_min - b.x;
+                let m_27 = s_ub - l_2_max - l_1_min - b.x;
                 model.add_constr(
                     &format!("bottom_right_{}_{}", nfp_idx, edge_idx),
                     c!(x2 - x1 - b.x <= (1.0 - v) * m_27),
@@ -155,7 +201,7 @@ fn main() -> Result<()> {
         // Constraint (28): left region constraint
         // x_j - x_i - x_fg_min <= (1 - v_l) * M_l
         // When v_l = 1: piece 2 must be at x-position <= x_fg_min relative to piece 1
-        let m_28 = s_ub - l_max - l_min - x_fg_min;
+        let m_28 = s_ub - l_2_max - l_1_min - x_fg_min;
         model.add_constr(
             &format!("left_region_{}", nfp_idx),
             c!(x2 - x1 - x_fg_min <= (1.0 - v_l) * m_28),
@@ -165,7 +211,7 @@ fn main() -> Result<()> {
         // x_j - x_i - x_fg_max >= (1 - v_r) * M_r
         // When v_r = 1: piece 2 must be at x-position >= x_fg_max relative to piece 1
         // Note: M_r is typically negative, which relaxes the constraint when v_r = 0
-        let m_29 = l_min + l_max - s_ub - x_fg_max;
+        let m_29 = l_2_min + l_1_max - s_ub - x_fg_max;
         model.add_constr(
             &format!("right_region_{}", nfp_idx),
             c!(x2 - x1 - x_fg_max >= (1.0 - v_r) * m_29),
