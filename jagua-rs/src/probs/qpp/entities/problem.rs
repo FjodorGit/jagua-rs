@@ -1,5 +1,3 @@
-use std::process::exit;
-
 use crate::Instant;
 use crate::entities::{Instance, Layout, PItemKey};
 use crate::geometry::DTransformation;

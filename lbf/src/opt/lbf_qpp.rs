@@ -1,5 +1,3 @@
-use std::process::exit;
-
 use jagua_rs::Instant;
 use jagua_rs::probs::qpp::entities::{QPInstance, QPPlacement, QPProblem, QPSolution};
 

@@ -1,240 +1,88 @@
-use geo::{LineString, Polygon, line_string, unary_union};
-use nfp::{NFPConvex, Point, point};
+use nfp::{NFPConvex, Point};
 
-pub const FULL_TREE: [Point; 15] = [
-    Point { x: 0.0, y: 0.8 },
-    Point { x: -0.125, y: 0.5 },
-    Point { x: -0.0625, y: 0.5 },
-    Point { x: -0.2, y: 0.25 },
-    Point { x: -0.1, y: 0.25 },
-    Point { x: -0.35, y: 0.0 },
-    Point { x: -0.075, y: 0.0 },
-    Point { x: -0.075, y: -0.2 },
-    Point { x: 0.075, y: -0.2 },
-    Point { x: 0.075, y: 0.0 },
-    Point { x: 0.35, y: 0.0 },
-    Point { x: 0.1, y: 0.25 },
-    Point { x: 0.2, y: 0.25 },
-    Point { x: 0.0625, y: 0.5 },
-    Point { x: 0.125, y: 0.5 },
-];
+use crate::tree::ChristmasTree;
 
-const SCALING_FACTOR: f64 = 10000.0;
-const TOP_TIER: [Point; 3] = [
-    Point { x: 0.0, y: 0.8 },
-    Point { x: -0.125, y: 0.5 },
-    Point { x: 0.125, y: 0.5 },
-];
-
-const MID_TIER: [Point; 4] = [
-    Point { x: -0.0625, y: 0.5 },
-    Point { x: -0.2, y: 0.25 },
-    Point { x: 0.2, y: 0.25 },
-    Point { x: 0.0625, y: 0.5 },
-];
-
-const LOW_TIER: [Point; 4] = [
-    Point { x: -0.1, y: 0.25 },
-    Point { x: -0.35, y: 0.0 },
-    Point { x: 0.35, y: 0.0 },
-    Point { x: 0.1, y: 0.25 },
-];
-
-const TRUNK: [Point; 4] = [
-    Point { x: -0.075, y: 0.0 },
-    Point { x: -0.075, y: -0.2 },
-    Point { x: 0.075, y: -0.2 },
-    Point { x: 0.075, y: 0.0 },
-];
-
-pub fn scale(poly: &[Point]) -> Vec<Point> {
-    poly.iter()
-        .map(|p| point(p.x * SCALING_FACTOR, p.y * SCALING_FACTOR))
-        .collect()
+pub struct NcNfp {
+    pub i_piece_idx: usize,
+    pub j_piece_idx: usize,
+    sub_nfps: Vec<Nfp>,
 }
-
-pub fn rotate(points: &[Point], deg: f64) -> Vec<Point> {
-    points
-        .iter()
-        .map(|p| {
-            let new_x = deg.to_radians().cos() * p.x - deg.to_radians().sin() * p.y;
-            let new_y = deg.to_radians().sin() * p.x + deg.to_radians().cos() * p.y;
-            Point::new(new_x, new_y)
-        })
-        .collect()
-}
-
-pub fn christmas_tree(deg: f64) -> Vec<Point> {
-    rotate(&scale(&FULL_TREE), deg)
-}
-
-pub fn christmas_tree_nfps(deg1: f64, deg2: f64) -> Vec<Vec<Point>> {
-    let tree1_top = rotate(&scale(&TOP_TIER), deg1);
-    let tree1_middle = rotate(&scale(&MID_TIER), deg1);
-    let tree1_low = rotate(&scale(&LOW_TIER), deg1);
-    let tree1_trunk = rotate(&scale(&TRUNK), deg1);
-
-    let tree2_top = rotate(&scale(&TOP_TIER), deg2);
-    let tree2_middle = rotate(&scale(&MID_TIER), deg2);
-    let tree2_low = rotate(&scale(&LOW_TIER), deg2);
-    let tree2_trunk = rotate(&scale(&TRUNK), deg2);
-
-    let convex_decomp_1 = [tree1_top, tree1_middle, tree1_low, tree1_trunk];
-    let convex_decomp_2 = [tree2_top, tree2_middle, tree2_low, tree2_trunk];
-
-    let names = ["top", "middle", "low", "trunk"];
-
-    std::fs::create_dir_all("output").ok();
-
-    let mut all_nfps = Vec::new();
-    let mut pair_idx = 0;
-    let mut polygons = vec![];
-    for (i, poly_a) in convex_decomp_1.iter().enumerate() {
-        for (j, poly_b) in convex_decomp_2.iter().enumerate() {
-            let mut nfp = NFPConvex::nfp(poly_a, poly_b).unwrap();
-            let point_tuples = nfp.iter().map(|p| (p.x, p.y)).collect::<Vec<(f64, f64)>>();
-            let linestring: LineString<f64> = point_tuples.into();
-            let polygon = Polygon::new(linestring, vec![]);
-            polygons.push(polygon);
-            let filename = format!("output/nfp_{}_{}_to_{}.svg", pair_idx, names[j], names[i]);
-            write_nfp_svg(&nfp, &filename, poly_a, poly_b);
-            nfp.push(nfp[0].clone());
-            all_nfps.push(nfp);
-            pair_idx += 1;
+impl NcNfp {
+    pub fn new(nfps: Vec<Nfp>, i: usize, j: usize) -> Self {
+        Self {
+            sub_nfps: nfps,
+            i_piece_idx: i,
+            j_piece_idx: j,
         }
     }
 
-    let polygon_union = unary_union(&polygons)
-        .0
-        .pop()
-        .expect("should have a polygon");
-
-    write_all_nfps_svg(&polygon_union, &convex_decomp_1, "output/all_nfps.svg");
-
-    all_nfps
+    pub fn sub_nfps(&self) -> impl Iterator<Item = &Nfp> {
+        self.sub_nfps.iter()
+    }
 }
 
-fn write_nfp_svg(nfp: &[Point], filename: &str, poly_a: &[Point], poly_b: &[Point]) {
-    let all_points: Vec<&Point> = nfp
-        .iter()
-        .chain(poly_a.iter())
-        .chain(poly_b.iter())
-        .collect();
-
-    let min_x = all_points.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
-    let max_x = all_points
-        .iter()
-        .map(|p| p.x)
-        .fold(f64::NEG_INFINITY, f64::max);
-    let min_y = all_points.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
-    let max_y = all_points
-        .iter()
-        .map(|p| p.y)
-        .fold(f64::NEG_INFINITY, f64::max);
-
-    let margin = 500.0;
-    let width = max_x - min_x + 2.0 * margin;
-    let height = max_y - min_y + 2.0 * margin;
-
-    let mut svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="{} {} {} {}" width="800" height="800">
-<rect width="100%" height="100%" fill="white"/>
-"#,
-        min_x - margin,
-        min_y - margin,
-        width,
-        height
-    );
-
-    svg.push_str(&format_polygon(poly_a, "blue", 0.3));
-    svg.push_str(&format_polygon(poly_b, "green", 0.3));
-    svg.push_str(&format_polygon(nfp, "red", 0.7));
-
-    svg.push_str("</svg>");
-
-    std::fs::write(filename, svg).unwrap();
+pub struct Nfp {
+    pub i_piece_idx: usize,
+    pub j_piece_idx: usize,
+    pub f_conv_piece_idx: usize,
+    pub g_conv_piece_idx: usize,
+    points: Vec<Point>,
 }
 
-fn format_polygon(points: &[Point], color: &str, opacity: f64) -> String {
-    if points.is_empty() {
-        return String::new();
+impl Nfp {
+    pub fn new(mut points: Vec<Point>, i: usize, j: usize, f: usize, g: usize) -> Nfp {
+        points.push(points[0]);
+        Self {
+            points,
+            i_piece_idx: i,
+            j_piece_idx: j,
+            f_conv_piece_idx: f,
+            g_conv_piece_idx: g,
+        }
     }
 
-    let points_str: String = points
-        .iter()
-        .map(|p| format!("{},{}", p.x, p.y))
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    format!(
-        r#"<polygon points="{}" fill="{}" stroke="black" stroke-width="20" fill-opacity="{}" />
-"#,
-        points_str, color, opacity
-    )
-}
-
-fn write_all_nfps_svg(union_polygon: &Polygon<f64>, convex_shapes: &[Vec<Point>], filename: &str) {
-    let union_coords: Vec<_> = union_polygon.exterior().coords().collect();
-
-    let all_x: Vec<f64> = union_coords
-        .iter()
-        .map(|c| c.x)
-        .chain(
-            convex_shapes
-                .iter()
-                .flat_map(|shape| shape.iter().map(|p| p.x)),
-        )
-        .collect();
-    let all_y: Vec<f64> = union_coords
-        .iter()
-        .map(|c| c.y)
-        .chain(
-            convex_shapes
-                .iter()
-                .flat_map(|shape| shape.iter().map(|p| p.y)),
-        )
-        .collect();
-
-    let min_x = all_x.iter().copied().fold(f64::INFINITY, f64::min);
-    let max_x = all_x.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let min_y = all_y.iter().copied().fold(f64::INFINITY, f64::min);
-    let max_y = all_y.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-
-    let margin = 1000.0;
-    let width = max_x - min_x + 2.0 * margin;
-    let height = max_y - min_y + 2.0 * margin;
-
-    let mut svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="{} {} {} {}">
-"#,
-        min_x - margin,
-        min_y - margin,
-        width,
-        height
-    );
-
-    for shape in convex_shapes.iter() {
-        svg.push_str(&format_polygon(shape, "blue", 0.5));
+    pub fn idx(&self) -> usize {
+        4 * self.f_conv_piece_idx + self.g_conv_piece_idx
     }
 
-    svg.push_str(&format_geo_polygon(union_polygon, "red", 0.5));
+    pub fn points(&self) -> impl Iterator<Item = &Point> {
+        self.points.iter()
+    }
 
-    svg.push_str("</svg>");
+    pub fn x_min(&self) -> f64 {
+        self.points
+            .iter()
+            .map(|p| p.x)
+            .fold(f64::INFINITY, f64::min)
+    }
 
-    std::fs::write(filename, svg).unwrap();
+    pub fn x_max(&self) -> f64 {
+        self.points
+            .iter()
+            .map(|p| p.x)
+            .fold(f64::NEG_INFINITY, f64::max)
+    }
+
+    pub fn edges(&self) -> impl Iterator<Item = (usize, Point, Point)> {
+        self.points
+            .windows(2)
+            .enumerate()
+            .map(|(i, w)| (i, w[0], w[1]))
+    }
 }
 
-fn format_geo_polygon(polygon: &Polygon<f64>, color: &str, opacity: f64) -> String {
-    let points_str: String = polygon
-        .exterior()
-        .coords()
-        .map(|c| format!("{},{}", c.x, c.y))
-        .collect::<Vec<_>>()
-        .join(" ");
+pub fn compute_nfps(trees: &[ChristmasTree]) -> Vec<NcNfp> {
+    let convex_decomp_1 = trees[0].convex_decomp();
+    let convex_decomp_2 = trees[1].convex_decomp();
 
-    format!(
-        r#"<polygon points="{}" fill="{}" stroke="black" stroke-width="20" fill-opacity="{}" />
-"#,
-        points_str, color, opacity
-    )
+    let mut all_nfps = Vec::new();
+    for (f, poly_a) in convex_decomp_1.iter().enumerate() {
+        for (g, poly_b) in convex_decomp_2.iter().enumerate() {
+            let nfp_points = NFPConvex::nfp(poly_a, poly_b).unwrap();
+            let nfp = Nfp::new(nfp_points, 0, 1, f, g);
+            all_nfps.push(nfp);
+        }
+    }
+    let ncnfp = NcNfp::new(all_nfps, 0, 1);
+    return vec![ncnfp];
 }
