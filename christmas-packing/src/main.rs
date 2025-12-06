@@ -2,8 +2,11 @@ pub mod gurobi_model;
 pub mod ncnfp;
 pub mod tree;
 
+use crate::gurobi_model::Solution;
 use crate::gurobi_model::solve_packing;
 use crate::tree::ChristmasTree;
+use crate::tree::SimpleTree;
+use crate::tree::Tree;
 use anyhow::{Context, Result};
 use clap::Parser as ClapParser;
 use jagua_rs::io::import::Importer;
@@ -30,35 +33,21 @@ use grb::prelude::*;
 // 2: deg1 = tan^{-1}(35/80), deg2 = deg1 + 180
 
 fn main() -> Result<()> {
-    let tree1 = ChristmasTree::new(23.);
-    let tree2 = ChristmasTree::new(203.);
-    let solution = solve_packing(&[tree1.clone(), tree2.clone()])?;
+    let trees = [
+        SimpleTree::new(23.),
+        SimpleTree::new(23.),
+        SimpleTree::new(23.),
+        SimpleTree::new(203.),
+        SimpleTree::new(203.),
+        SimpleTree::new(203.),
+    ];
+    let solution = solve_packing(&trees)?;
 
     println!("Solution found!");
     println!("  Square size: {:.2}", solution.s);
-    for (i, (x, y)) in solution.positions.iter().enumerate() {
-        println!("  Tree {}: x = {:.2}, y = {:.2}", i, x, y);
-    }
-
-    // Translate trees to their positions
-    let tree1_positioned: Vec<_> = tree1
-        .points()
-        .iter()
-        .map(|p| point(p.x + solution.positions[0].0, p.y + solution.positions[0].1))
-        .collect();
-    let tree2_positioned: Vec<_> = tree2
-        .points()
-        .iter()
-        .map(|p| point(p.x + solution.positions[1].0, p.y + solution.positions[1].1))
-        .collect();
 
     // Plot the solution
-    plot_solution(
-        &tree1_positioned,
-        &tree2_positioned,
-        solution.s,
-        "output/solution.svg",
-    );
+    plot_solution(&trees, solution, "output/solution.svg");
     println!("Solution plotted to output/solution.svg");
 
     exit(0);
@@ -161,25 +150,26 @@ fn main_qpp(
     Ok(csv_items)
 }
 
-fn plot_solution(tree1: &[nfp::Point], tree2: &[nfp::Point], square_size: f64, filename: &str) {
-    let all_points: Vec<&nfp::Point> = tree1.iter().chain(tree2.iter()).collect();
+fn plot_solution<S: Tree>(shapes: &[S], sol: Solution, filename: &str) {
+    // Calculate view bounds using shape bounds and positions
+    let mut min_x: f64 = 0.0;
+    let mut max_x = sol.s;
+    let mut min_y: f64 = 0.0;
+    let mut max_y = sol.s;
 
-    let min_x = all_points.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
-    let max_x = all_points
-        .iter()
-        .map(|p| p.x)
-        .fold(f64::NEG_INFINITY, f64::max);
-    let min_y = all_points.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
-    let max_y = all_points
-        .iter()
-        .map(|p| p.y)
-        .fold(f64::NEG_INFINITY, f64::max);
+    for (shape, p) in shapes.iter().zip(sol.positions.iter()) {
+        let bounds = shape.bounds();
+        min_x = min_x.min(p.x - bounds.l_min);
+        max_x = max_x.max(p.x + bounds.l_max);
+        min_y = min_y.min(p.y - bounds.h_min);
+        max_y = max_y.max(p.y + bounds.h_max);
+    }
 
     let margin = 1000.0;
-    let view_min_x = min_x.min(0.0) - margin;
-    let view_min_y = min_y.min(0.0) - margin;
-    let view_max_x = max_x.max(square_size) + margin;
-    let view_max_y = max_y.max(square_size) + margin;
+    let view_min_x = min_x - margin;
+    let view_min_y = min_y - margin;
+    let view_max_x = max_x + margin;
+    let view_max_y = max_y + margin;
     let width = view_max_x - view_min_x;
     let height = view_max_y - view_min_y;
 
@@ -193,32 +183,28 @@ fn plot_solution(tree1: &[nfp::Point], tree2: &[nfp::Point], square_size: f64, f
     svg.push_str(&format!(
         r#"<rect x="0" y="0" width="{}" height="{}" fill="lightgray" fill-opacity="0.2" stroke="red" stroke-width="100" />
 "#,
-        square_size, square_size
+        sol.s, sol.s
     ));
 
-    // Draw trees
-    svg.push_str(&format_tree_polygon(tree1, "green", 0.6));
-    svg.push_str(&format_tree_polygon(tree2, "darkgreen", 0.6));
+    // Draw shapes
+    let colors = ["green", "darkgreen", "forestgreen", "limegreen"];
+    for (i, (shape, pos)) in shapes.iter().zip(sol.positions.iter()).enumerate() {
+        let color = colors[i % colors.len()];
+        let points_str: String = shape
+            .points()
+            .iter()
+            .map(|p| format!("{},{}", p.x + pos.x, p.y + pos.y))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        svg.push_str(&format!(
+            r#"<polygon points="{}" fill="{}" stroke="black" stroke-width="20" fill-opacity="0.6" />
+"#,
+            points_str, color
+        ));
+    }
 
     svg.push_str("</svg>");
 
     std::fs::write(filename, svg).unwrap();
-}
-
-fn format_tree_polygon(points: &[nfp::Point], color: &str, opacity: f64) -> String {
-    if points.is_empty() {
-        return String::new();
-    }
-
-    let points_str: String = points
-        .iter()
-        .map(|p| format!("{},{}", p.x, p.y))
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    format!(
-        r#"<polygon points="{}" fill="{}" stroke="black" stroke-width="20" fill-opacity="{}" />
-"#,
-        points_str, color, opacity
-    )
 }

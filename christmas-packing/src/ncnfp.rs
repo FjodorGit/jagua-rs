@@ -1,6 +1,6 @@
 use nfp::{NFPConvex, Point};
 
-use crate::tree::ChristmasTree;
+use crate::tree::Tree;
 
 pub struct NcNfp {
     pub i_piece_idx: usize,
@@ -71,18 +71,34 @@ impl Nfp {
     }
 }
 
-pub fn compute_nfps(trees: &[ChristmasTree]) -> Vec<NcNfp> {
-    let convex_decomp_1 = trees[0].convex_decomp();
-    let convex_decomp_2 = trees[1].convex_decomp();
+pub fn compute_nfps<S: Tree>(shapes: &[S]) -> Vec<NcNfp> {
+    let n = shapes.len();
+    let mut all_ncnfps = Vec::new();
 
-    let mut all_nfps = Vec::new();
-    for (f, poly_a) in convex_decomp_1.iter().enumerate() {
-        for (g, poly_b) in convex_decomp_2.iter().enumerate() {
-            let nfp_points = NFPConvex::nfp(poly_a, poly_b).unwrap();
-            let nfp = Nfp::new(nfp_points, 0, 1, f, g);
-            all_nfps.push(nfp);
+    // Pre-compute convex decompositions for all shapes
+    let convex_decomps: Vec<_> = shapes.iter().map(|s| s.convex_decomp()).collect();
+
+    // Compute NFPs for all pairs (i, j) where i < j
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let convex_decomp_i = &convex_decomps[i];
+            let convex_decomp_j = &convex_decomps[j];
+
+            let mut nfps_for_pair = Vec::new();
+
+            // Compute NFP between all pairs of convex parts
+            for (f, poly_a) in convex_decomp_i.iter().enumerate() {
+                for (g, poly_b) in convex_decomp_j.iter().enumerate() {
+                    let nfp_points = NFPConvex::nfp(poly_a, poly_b).unwrap();
+                    let nfp = Nfp::new(nfp_points, i, j, f, g);
+                    nfps_for_pair.push(nfp);
+                }
+            }
+
+            let ncnfp = NcNfp::new(nfps_for_pair, i, j);
+            all_ncnfps.push(ncnfp);
         }
     }
-    let ncnfp = NcNfp::new(all_nfps, 0, 1);
-    return vec![ncnfp];
+
+    all_ncnfps
 }

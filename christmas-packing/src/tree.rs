@@ -18,6 +18,16 @@ pub const FULL_TREE: [Point; 15] = [
     Point { x: 0.125, y: 0.5 },
 ];
 
+pub const SIMPLE_TREE: [Point; 7] = [
+    Point { x: 0.0, y: 0.8 },
+    Point { x: -0.35, y: 0.0 },
+    Point { x: -0.075, y: 0.0 },
+    Point { x: -0.075, y: -0.2 },
+    Point { x: 0.075, y: -0.2 },
+    Point { x: 0.075, y: 0.0 },
+    Point { x: 0.35, y: 0.0 },
+];
+
 const SCALING_FACTOR: f64 = 10000.0;
 const TOP_TIER: [Point; 3] = [
     Point { x: 0.0, y: 0.8 },
@@ -63,14 +73,53 @@ pub fn rotate(points: &[Point], deg: f64) -> Vec<Point> {
         .collect()
 }
 
+pub trait Tree: Clone {
+    fn new(deg: f64) -> Self;
+    fn points(&self) -> &[Point];
+    fn translate(&self, t: Point) -> Self;
+    fn convex_decomp(&self) -> Vec<Vec<Point>>;
+
+    fn bounds(&self) -> PieceBounds {
+        let x_min = self
+            .points()
+            .iter()
+            .map(|p| p.x)
+            .fold(f64::INFINITY, f64::min);
+        let x_max = self
+            .points()
+            .iter()
+            .map(|p| p.x)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let y_min = self
+            .points()
+            .iter()
+            .map(|p| p.y)
+            .fold(f64::INFINITY, f64::min);
+        let y_max = self
+            .points()
+            .iter()
+            .map(|p| p.y)
+            .fold(f64::NEG_INFINITY, f64::max);
+        PieceBounds {
+            l_min: x_min.abs(),
+            l_max: x_max.abs(),
+            h_min: y_min.abs(),
+            h_max: y_max.abs(),
+            width: x_min.abs() + x_max.abs(),
+            height: y_min.abs() + y_max.abs(),
+        }
+    }
+    fn rotation(&self) -> f64;
+}
+
 #[derive(Debug, Clone)]
 pub struct ChristmasTree {
     points: Vec<Point>,
-    rotation: f64,
+    pub rotation: f64,
 }
 
-impl ChristmasTree {
-    pub fn new(deg: f64) -> ChristmasTree {
+impl Tree for ChristmasTree {
+    fn new(deg: f64) -> ChristmasTree {
         let points = rotate(&scale(&FULL_TREE), deg);
         Self {
             points,
@@ -78,11 +127,27 @@ impl ChristmasTree {
         }
     }
 
-    pub fn points(&self) -> &[Point] {
+    fn rotation(&self) -> f64 {
+        self.rotation
+    }
+
+    fn points(&self) -> &[Point] {
         &self.points
     }
 
-    pub fn convex_decomp(&self) -> [Vec<Point>; 4] {
+    fn translate(&self, t: Point) -> Self {
+        let points = self
+            .points()
+            .iter()
+            .map(|p| Point::new(p.x + t.x, p.y + t.y))
+            .collect();
+        Self {
+            points,
+            rotation: self.rotation,
+        }
+    }
+
+    fn convex_decomp(&self) -> Vec<Vec<Point>> {
         let top = vec![self.points[0], self.points[1], self.points[14]];
         let mid = vec![
             self.points[2],
@@ -102,38 +167,54 @@ impl ChristmasTree {
             self.points[8],
             self.points[9],
         ];
-        [top, mid, low, trunk]
+        vec![top, mid, low, trunk]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SimpleTree {
+    points: Vec<Point>,
+    pub rotation: f64,
+}
+
+impl Tree for SimpleTree {
+    fn new(deg: f64) -> Self {
+        let points = rotate(&scale(&SIMPLE_TREE), deg);
+        Self {
+            points,
+            rotation: deg,
+        }
     }
 
-    pub fn bounds(&self) -> PieceBounds {
-        let x_min = self
+    fn rotation(&self) -> f64 {
+        self.rotation
+    }
+
+    fn points(&self) -> &[Point] {
+        &self.points
+    }
+
+    fn translate(&self, t: Point) -> Self {
+        let points = self
             .points
             .iter()
-            .map(|p| p.x)
-            .fold(f64::INFINITY, f64::min);
-        let x_max = self
-            .points
-            .iter()
-            .map(|p| p.x)
-            .fold(f64::NEG_INFINITY, f64::max);
-        let y_min = self
-            .points
-            .iter()
-            .map(|p| p.y)
-            .fold(f64::INFINITY, f64::min);
-        let y_max = self
-            .points
-            .iter()
-            .map(|p| p.y)
-            .fold(f64::NEG_INFINITY, f64::max);
-        PieceBounds {
-            l_min: x_min.abs(),
-            l_max: x_max.abs(),
-            h_min: y_min.abs(),
-            h_max: y_max.abs(),
-            width: x_min.abs() + x_max.abs(),
-            height: y_min.abs() + y_max.abs(),
+            .map(|p| Point::new(p.x + t.x, p.y + t.y))
+            .collect();
+        Self {
+            points,
+            rotation: self.rotation,
         }
+    }
+
+    fn convex_decomp(&self) -> Vec<Vec<Point>> {
+        let top = vec![self.points[0], self.points[1], self.points[6]];
+        let trunk = vec![
+            self.points[2],
+            self.points[3],
+            self.points[4],
+            self.points[5],
+        ];
+        vec![top, trunk]
     }
 }
 

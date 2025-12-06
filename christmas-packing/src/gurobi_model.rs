@@ -1,18 +1,21 @@
 use grb::prelude::*;
+use nfp::Point;
 
 use crate::{
     ncnfp::{NcNfp, Nfp, compute_nfps},
-    tree::{ChristmasTree, PieceBounds},
+    tree::{self, PieceBounds, Tree},
 };
 
-/// Solve the packing problem for n trees with given rotations
-pub fn solve_packing(trees: &[ChristmasTree]) -> Result<Solution, grb::Error> {
+/// Solve the packing problem for n shapes with given rotations
+pub fn solve_packing<S: Tree>(trees: &[S]) -> Result<Solution, grb::Error> {
     let n = trees.len();
     let nc_nfps: Vec<NcNfp> = compute_nfps(trees);
-    let mut model = Model::new("n_christmas_trees")?;
+
+    let mut model = Model::new("n_shapes")?;
+    model.set_param(param::NumericFocus, 0)?;
 
     // Compute per-piece geometry bounds (distances from reference point to boundaries)
-    let bounds: Vec<PieceBounds> = trees.iter().map(|tree| tree.bounds()).collect();
+    let bounds: Vec<PieceBounds> = trees.iter().map(|shape| shape.bounds()).collect();
 
     // Constraint (21): Lower bound for s
     let s_lb = bounds.iter().map(|b| b.max_diameter()).fold(0.0, f64::max);
@@ -62,10 +65,12 @@ pub fn solve_packing(trees: &[ChristmasTree]) -> Result<Solution, grb::Error> {
     // Symmetry breaking: order identical pieces by y-coordinate
     // This assumes all trees are identical - adjust if they have different shapes
     for i in 0..(n - 1) {
-        model.add_constr(
-            &format!("symmetry_breaking_{}", i),
-            c!(y_vars[i] <= y_vars[i + 1]),
-        )?;
+        if trees[i].rotation() == trees[i + 1].rotation() {
+            model.add_constr(
+                &format!("symmetry_breaking_{}", i),
+                c!(y_vars[i] <= y_vars[i + 1]),
+            )?;
+        }
     }
 
     // Objective function (17): minimize square side length
@@ -83,13 +88,13 @@ pub fn solve_packing(trees: &[ChristmasTree]) -> Result<Solution, grb::Error> {
 
     if status == Status::Optimal || status == Status::SubOptimal {
         let s_val = model.get_obj_attr(attr::X, &s)?;
-        let positions: Vec<(f64, f64)> = x_vars
+        let positions: Vec<Point> = x_vars
             .iter()
             .zip(y_vars.iter())
             .map(|(x, y)| {
                 let x_val = model.get_obj_attr(attr::X, x).unwrap();
                 let y_val = model.get_obj_attr(attr::X, y).unwrap();
-                (x_val, y_val)
+                Point::new(x_val, y_val)
             })
             .collect();
 
@@ -258,6 +263,6 @@ fn add_nfp_constraints(
 #[derive(Debug)]
 pub struct Solution {
     pub s: f64,
-    pub positions: Vec<(f64, f64)>,
+    pub positions: Vec<Point>,
     pub status: Status,
 }
