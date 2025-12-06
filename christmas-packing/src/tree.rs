@@ -28,6 +28,14 @@ pub const SIMPLE_TREE: [Point; 7] = [
     Point { x: 0.35, y: 0.0 },
 ];
 
+pub const CONVEX_HULL: [Point; 5] = [
+    Point { x: 0.0, y: 0.8 },
+    Point { x: -0.35, y: 0.0 },
+    Point { x: -0.075, y: -0.2 },
+    Point { x: 0.075, y: -0.2 },
+    Point { x: 0.35, y: 0.0 },
+];
+
 const SCALING_FACTOR: f64 = 10000.0;
 const TOP_TIER: [Point; 3] = [
     Point { x: 0.0, y: 0.8 },
@@ -215,6 +223,46 @@ impl Tree for SimpleTree {
             self.points[5],
         ];
         vec![top, trunk]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ConvexHull {
+    points: Vec<Point>,
+    pub rotation: f64,
+}
+
+impl Tree for ConvexHull {
+    fn new(deg: f64) -> Self {
+        let points = rotate(&scale(&CONVEX_HULL), deg);
+        Self {
+            points,
+            rotation: deg,
+        }
+    }
+
+    fn rotation(&self) -> f64 {
+        self.rotation
+    }
+
+    fn points(&self) -> &[Point] {
+        &self.points
+    }
+
+    fn translate(&self, t: Point) -> Self {
+        let points = self
+            .points
+            .iter()
+            .map(|p| Point::new(p.x + t.x, p.y + t.y))
+            .collect();
+        Self {
+            points,
+            rotation: self.rotation,
+        }
+    }
+
+    fn convex_decomp(&self) -> Vec<Vec<Point>> {
+        vec![self.points.to_vec()]
     }
 }
 

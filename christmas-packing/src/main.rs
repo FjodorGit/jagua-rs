@@ -5,6 +5,7 @@ pub mod tree;
 use crate::gurobi_model::Solution;
 use crate::gurobi_model::solve_packing;
 use crate::tree::ChristmasTree;
+use crate::tree::ConvexHull;
 use crate::tree::SimpleTree;
 use crate::tree::Tree;
 use anyhow::{Context, Result};
@@ -34,12 +35,12 @@ use grb::prelude::*;
 
 fn main() -> Result<()> {
     let trees = [
-        SimpleTree::new(23.),
-        SimpleTree::new(23.),
-        SimpleTree::new(23.),
-        SimpleTree::new(203.),
-        SimpleTree::new(203.),
-        SimpleTree::new(203.),
+        ConvexHull::new(23.),
+        ConvexHull::new(23.),
+        ConvexHull::new(23.),
+        ConvexHull::new(203.),
+        ConvexHull::new(203.),
+        ConvexHull::new(203.),
     ];
     let solution = solve_packing(&trees)?;
 
