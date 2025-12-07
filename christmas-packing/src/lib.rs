@@ -1,4 +1,4 @@
-pub mod gurobi_model;
+pub mod gurobi_model_nfp;
 pub mod ncnfp;
 pub mod tree;
 

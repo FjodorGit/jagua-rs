@@ -5,12 +5,14 @@ use crate::tree::Tree;
 pub struct NcNfp {
     pub i_piece_idx: usize,
     pub j_piece_idx: usize,
+    pub indentical_pieces: bool,
     sub_nfps: Vec<Nfp>,
 }
 impl NcNfp {
-    pub fn new(nfps: Vec<Nfp>, i: usize, j: usize) -> Self {
+    pub fn new(nfps: Vec<Nfp>, i: usize, j: usize, identical: bool) -> Self {
         Self {
             sub_nfps: nfps,
+            indentical_pieces: identical,
             i_piece_idx: i,
             j_piece_idx: j,
         }
@@ -18,6 +20,10 @@ impl NcNfp {
 
     pub fn sub_nfps(&self) -> impl Iterator<Item = &Nfp> {
         self.sub_nfps.iter()
+    }
+
+    pub fn as_sub_nfps(self) -> Vec<Nfp> {
+        self.sub_nfps
     }
 }
 
@@ -71,12 +77,12 @@ impl Nfp {
     }
 }
 
-pub fn compute_nfps<S: Tree>(shapes: &[S]) -> Vec<NcNfp> {
-    let n = shapes.len();
+pub fn compute_nfps<S: Tree>(trees: &[S]) -> Vec<NcNfp> {
+    let n = trees.len();
     let mut all_ncnfps = Vec::new();
 
     // Pre-compute convex decompositions for all shapes
-    let convex_decomps: Vec<_> = shapes.iter().map(|s| s.convex_decomp()).collect();
+    let convex_decomps: Vec<_> = trees.iter().map(|s| s.convex_decomp()).collect();
 
     // Compute NFPs for all pairs (i, j) where i < j
     for i in 0..n {
@@ -95,7 +101,8 @@ pub fn compute_nfps<S: Tree>(shapes: &[S]) -> Vec<NcNfp> {
                 }
             }
 
-            let ncnfp = NcNfp::new(nfps_for_pair, i, j);
+            let identical = trees[i].rotation() == trees[j].rotation();
+            let ncnfp = NcNfp::new(nfps_for_pair, i, j, identical);
             all_ncnfps.push(ncnfp);
         }
     }

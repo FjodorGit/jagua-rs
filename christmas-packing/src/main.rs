@@ -1,9 +1,10 @@
-pub mod gurobi_model;
+pub mod gurobi_model_ep;
+pub mod gurobi_model_nfp;
 pub mod ncnfp;
 pub mod tree;
 
-use crate::gurobi_model::Solution;
-use crate::gurobi_model::solve_packing;
+use crate::gurobi_model_nfp::Solution;
+use crate::gurobi_model_nfp::solve_packing;
 use crate::tree::ChristmasTree;
 use crate::tree::ConvexHull;
 use crate::tree::SimpleTree;
@@ -35,12 +36,9 @@ use grb::prelude::*;
 
 fn main() -> Result<()> {
     let trees = [
-        ConvexHull::new(23.),
-        ConvexHull::new(23.),
-        ConvexHull::new(23.),
-        ConvexHull::new(203.),
-        ConvexHull::new(203.),
-        ConvexHull::new(203.),
+        ChristmasTree::new(23.),
+        ChristmasTree::new(203.),
+        ChristmasTree::new(203.),
     ];
     let solution = solve_packing(&trees)?;
 
