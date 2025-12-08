@@ -36,10 +36,10 @@ use grb::prelude::*;
 
 fn main() -> Result<()> {
     let trees = [
-        ChristmasTree::new(23.),
-        ChristmasTree::new(23.),
-        ChristmasTree::new(203.),
-        ChristmasTree::new(203.),
+        ChristmasTree::new(0.),
+        ChristmasTree::new(90.),
+        ChristmasTree::new(180.),
+        ChristmasTree::new(270.),
     ];
     let solution = solve_packing(&trees)?;
 

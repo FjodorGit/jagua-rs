@@ -23,7 +23,7 @@ struct HalfPlaneVar {
 
 impl EdgeVar {
     fn is_top(&self) -> bool {
-        self.a.x > self.b.x - 1e10
+        self.a.x > self.b.x - 1e-10
     }
 
     fn point_is_to_the_right(&self, c: Point) -> bool {
@@ -41,8 +41,8 @@ impl EdgeVar {
     }
 
     fn contains(&self, other: &Self) -> bool {
-        self.left_bound() > other.left_bound() - 1e-10
-            && self.right_bound() < other.right_bound() - 1e-10
+        self.left_bound() <= other.left_bound() - 1e-10
+            && self.right_bound() >= other.right_bound() + 1e-10
             && self.point_is_to_the_right(other.a)
             && self.point_is_to_the_right(other.b)
     }
@@ -88,9 +88,9 @@ fn is_subsumed(inner: &RegionGeometry, outer: &RegionGeometry) -> bool {
             edge.left_bound() > r.x_bound + 1e-10
         }
         // Slice ⊂ Slice: inner must be contained in outer's x-range
-        // (RegionGeometry::Slice(edge_in), RegionGeometry::Slice(edge_out)) => {
-        //     edge_in.contains(edge_out)
-        // }
+        (RegionGeometry::Slice(edge_in), RegionGeometry::Slice(edge_out)) => {
+            edge_out.contains(edge_in)
+        }
         // Left/Right cannot be subsumed by Slice (infinite vs finite)
         _ => false,
     }
