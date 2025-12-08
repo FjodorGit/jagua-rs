@@ -37,6 +37,7 @@ use grb::prelude::*;
 fn main() -> Result<()> {
     let trees = [
         ChristmasTree::new(23.),
+        ChristmasTree::new(23.),
         ChristmasTree::new(203.),
         ChristmasTree::new(203.),
     ];
