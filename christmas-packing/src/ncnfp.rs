@@ -27,6 +27,7 @@ impl NcNfp {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Nfp {
     pub i_piece_idx: usize,
     pub j_piece_idx: usize,

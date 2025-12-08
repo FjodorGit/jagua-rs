@@ -2,20 +2,22 @@ use std::collections::HashMap;
 
 use grb::prelude::*;
 use nfp::Point;
+use petgraph::{adj::NodeIndex, algo::maximal_cliques, graph::UnGraph};
 
 use crate::{
+    edge_clique_cover::greedy_edge_clique_cover,
     ncnfp::{NcNfp, Nfp, compute_nfps},
     tree::{PieceBounds, Tree},
 };
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct EdgeVar {
     a: Point,
     b: Point,
     v: Var,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 struct HalfPlaneVar {
     x_bound: f64,
     v: Var,
@@ -41,6 +43,9 @@ impl EdgeVar {
     }
 
     fn contains(&self, other: &Self) -> bool {
+        if self.is_top() != other.is_top() {
+            return false;
+        }
         self.left_bound() <= other.left_bound() - 1e-10
             && self.right_bound() >= other.right_bound() + 1e-10
             && self.point_is_to_the_right(other.a)
@@ -48,6 +53,7 @@ impl EdgeVar {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 /// Represents a region's geometry for containment checking
 enum RegionGeometry {
     /// Half-plane: x < x_bound
@@ -64,6 +70,58 @@ impl RegionGeometry {
             RegionGeometry::Left(half_plane_var) => half_plane_var.v,
             RegionGeometry::Right(half_plane_var) => half_plane_var.v,
             RegionGeometry::Slice(edge_var) => edge_var.v,
+        }
+    }
+
+    fn intersects(&self, other: &Self) -> bool {
+        match (self, other) {
+            (RegionGeometry::Left(l_self), RegionGeometry::Right(r_other)) => {
+                l_self.x_bound > r_other.x_bound
+            }
+            (RegionGeometry::Right(r_self), RegionGeometry::Left(l_other)) => {
+                l_other.x_bound > r_self.x_bound
+            }
+            (RegionGeometry::Left(l_self), RegionGeometry::Slice(edge)) => {
+                l_self.x_bound > edge.left_bound()
+            }
+            (RegionGeometry::Right(r_self), RegionGeometry::Slice(edge)) => {
+                r_self.x_bound < edge.right_bound()
+            }
+            (RegionGeometry::Slice(edge), RegionGeometry::Left(l_other)) => {
+                l_other.x_bound > edge.left_bound()
+            }
+            (RegionGeometry::Slice(edge), RegionGeometry::Right(r_other)) => {
+                r_other.x_bound < edge.right_bound()
+            }
+            (RegionGeometry::Slice(edge_self), RegionGeometry::Slice(edge_other)) => {
+                let EdgeVar { a, b, .. } = *edge_self;
+                let EdgeVar { a: c, b: d, .. } = edge_other;
+                // Check if segment (c,d) projects onto the "span" of segment (a,b)
+                // when viewed perpendicular to (a,b)
+                let cross1_c = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+                let cross1_d = (b.x - a.x) * (d.y - a.y) - (b.y - a.y) * (d.x - a.x);
+
+                let cross2_a = (d.x - c.x) * (a.y - c.y) - (d.y - c.y) * (a.x - c.x);
+                let cross2_b = (d.x - c.x) * (b.y - c.y) - (d.y - c.y) * (b.x - c.x);
+
+                let proj_c = (c.x - a.x) * (b.x - a.x) + (c.y - a.y) * (b.y - a.y);
+                let proj_d = (d.x - a.x) * (b.x - a.x) + (d.y - a.y) * (b.y - a.y);
+                let len_ab_sq = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
+
+                let proj_a = (a.x - c.x) * (d.x - c.x) + (a.y - c.y) * (d.y - c.y);
+                let proj_b = (b.x - c.x) * (d.x - c.x) + (b.y - c.y) * (d.y - c.y);
+                let len_cd_sq = (d.x - c.x) * (d.x - c.x) + (d.y - c.y) * (d.y - c.y);
+
+                let overlap1 =
+                    (proj_c >= 0. || proj_d >= 0.) && (proj_c <= len_ab_sq || proj_d <= len_ab_sq);
+                let overlap2 =
+                    (proj_a >= 0. || proj_b >= 0.) && (proj_a <= len_cd_sq || proj_b <= len_cd_sq);
+                (cross1_c <= 0. || cross1_d <= 0.)
+                    && (cross2_a <= 0. || cross2_b <= 0.)
+                    && overlap1
+                    && overlap2
+            }
+            _ => true,
         }
     }
 }
@@ -96,6 +154,7 @@ fn is_subsumed(inner: &RegionGeometry, outer: &RegionGeometry) -> bool {
     }
 }
 
+#[derive(Debug)]
 struct NfpVarInfo {
     nfp: Nfp,
     left_var: HalfPlaneVar,
@@ -329,6 +388,7 @@ fn add_nfp_vars(model: &mut Model, nc_nfp: NcNfp) -> Result<Vec<NfpVarInfo>, grb
         nfp_var_infos.push(nfp_var);
     }
     add_subsumption_constraints(model, &nfp_var_infos)?;
+    // add_clique_based_constraints(model, &nfp_var_infos)?;
     Ok(nfp_var_infos)
 }
 
@@ -562,6 +622,64 @@ fn add_subsumption_constraints(
                     constr_idx += 1;
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+fn add_clique_based_constraints(
+    model: &mut Model,
+    nfp_var_infos: &[NfpVarInfo],
+) -> Result<(), grb::Error> {
+    if nfp_var_infos.is_empty() {
+        return Ok(());
+    }
+
+    let i = nfp_var_infos[0].i_piece_idx();
+    let j = nfp_var_infos[0].j_piece_idx();
+    // Collect all regions from all NFP parts, tagged with their NFP part index
+    let all_regions: Vec<(usize, RegionGeometry)> = nfp_var_infos
+        .iter()
+        .enumerate()
+        .flat_map(|(fg_idx, nfp_info)| nfp_info.all_regions().into_iter().map(move |r| (fg_idx, r)))
+        .collect();
+
+    let n = all_regions.len();
+
+    // Build conflict graph: edge if regions DON'T intersect AND are from different NFP parts
+    let mut edges: Vec<(u32, u32)> = Vec::new();
+    for k in 0..n {
+        for l in (k + 1)..n {
+            let (fg_k, region_k) = &all_regions[k];
+            let (fg_l, region_l) = &all_regions[l];
+
+            // Only consider regions from different NFP parts
+            if fg_k != fg_l && !region_k.intersects(region_l) {
+                edges.push((k as u32, l as u32));
+            }
+        }
+    }
+
+    if edges.is_empty() {
+        return Ok(());
+    }
+
+    // Build graph and find maximal cliques
+    let cliques = greedy_edge_clique_cover(n, &edges);
+
+    // Add constraint for each clique with more than one node
+    for (clique_idx, clique) in cliques.iter().enumerate() {
+        if clique.len() > 1 {
+            let vars: Vec<Var> = clique
+                .iter()
+                .map(|&node_idx| all_regions[node_idx].1.var())
+                .collect();
+
+            model.add_constr(
+                &format!("clique_{}_{}_{}", i, j, clique_idx),
+                c!(vars.grb_sum() <= 1),
+            )?;
         }
     }
 

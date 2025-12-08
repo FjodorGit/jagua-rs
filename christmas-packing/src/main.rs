@@ -1,4 +1,4 @@
-pub mod gurobi_model_ep;
+pub mod edge_clique_cover;
 pub mod gurobi_model_nfp;
 pub mod ncnfp;
 pub mod tree;
@@ -22,7 +22,6 @@ use lbf::io::output::{CSVPlacedItem, CombinedCSVItem, QPOutput, layout_to_csv};
 use lbf::io::{init_logger, read_qpp_instance, write_combined_csv, write_svg};
 use lbf::opt::lbf_qpp::LBFOptimizerQP;
 use log::{info, warn};
-use nfp::{NFPConvex, point};
 use rand::SeedableRng;
 use rand::prelude::SmallRng;
 use std::fs::{self, File};
@@ -30,15 +29,13 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
-use grb::prelude::*;
-
 // 2: deg1 = tan^{-1}(35/80), deg2 = deg1 + 180
 
 fn main() -> Result<()> {
     let trees = [
-        ChristmasTree::new(0.),
+        ChristmasTree::new(23.),
         ChristmasTree::new(90.),
-        ChristmasTree::new(180.),
+        ChristmasTree::new(203.),
         ChristmasTree::new(270.),
     ];
     let solution = solve_packing(&trees)?;
