@@ -36,7 +36,7 @@ pub const CONVEX_HULL: [Point; 5] = [
     Point { x: 0.35, y: 0.0 },
 ];
 
-const SCALING_FACTOR: f64 = 10000.0;
+pub const SCALING_FACTOR: f64 = 100.0;
 const TOP_TIER: [Point; 3] = [
     Point { x: 0.0, y: 0.8 },
     Point { x: -0.125, y: 0.5 },

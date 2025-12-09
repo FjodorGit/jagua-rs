@@ -7,6 +7,7 @@ use crate::gurobi_model_nfp::Solution;
 use crate::gurobi_model_nfp::solve_packing;
 use crate::tree::ChristmasTree;
 use crate::tree::ConvexHull;
+use crate::tree::SCALING_FACTOR;
 use crate::tree::SimpleTree;
 use crate::tree::Tree;
 use anyhow::{Context, Result};
@@ -35,10 +36,10 @@ fn main() -> Result<()> {
     let trees = [
         SimpleTree::new(23.),
         SimpleTree::new(23.),
-        SimpleTree::new(45.),
+        SimpleTree::new(23.),
         SimpleTree::new(203.),
         SimpleTree::new(203.),
-        SimpleTree::new(225.),
+        SimpleTree::new(203.),
     ];
     let solution = solve_packing(&trees)?;
 
@@ -164,7 +165,7 @@ fn plot_solution<S: Tree>(shapes: &[S], sol: Solution, filename: &str) {
         max_y = max_y.max(p.y + bounds.h_max);
     }
 
-    let margin = 1000.0;
+    let margin = SCALING_FACTOR * 0.005;
     let view_min_x = min_x - margin;
     let view_min_y = min_y - margin;
     let view_max_x = max_x + margin;
@@ -180,7 +181,7 @@ fn plot_solution<S: Tree>(shapes: &[S], sol: Solution, filename: &str) {
 
     // Draw square boundary
     svg.push_str(&format!(
-        r#"<rect x="0" y="0" width="{}" height="{}" fill="lightgray" fill-opacity="0.2" stroke="red" stroke-width="100" />
+        r#"<rect x="0" y="0" width="{}" height="{}" fill="lightgray" fill-opacity="0.2" stroke="red" />
 "#,
         sol.s, sol.s
     ));
@@ -197,9 +198,9 @@ fn plot_solution<S: Tree>(shapes: &[S], sol: Solution, filename: &str) {
             .join(" ");
 
         svg.push_str(&format!(
-            r#"<polygon points="{}" fill="{}" stroke="black" stroke-width="20" fill-opacity="0.6" />
+            r#"<polygon points="{}" fill="{}" stroke="black" fill-opacity="0.6" />
 "#,
-            points_str, color
+            points_str, color,
         ));
     }
 

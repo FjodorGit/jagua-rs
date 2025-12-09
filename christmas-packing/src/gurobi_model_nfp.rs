@@ -218,7 +218,7 @@ pub fn solve_packing<S: Tree>(trees: &[S]) -> Result<Solution, grb::Error> {
     model.set_param(param::NumericFocus, 0)?;
 
     // Compute per-piece geometry bounds (distances from reference point to boundaries)
-    let bounds: Vec<PieceBounds> = trees.iter().map(|shape| shape.bounds()).collect();
+    let bounds: Vec<PieceBounds> = trees.iter().map(|tree| tree.bounds()).collect();
 
     // Constraint (21): Lower bound for s
     let s_lb = bounds.iter().map(|b| b.max_diameter()).fold(0.0, f64::max);
@@ -258,7 +258,6 @@ pub fn solve_packing<S: Tree>(trees: &[S]) -> Result<Solution, grb::Error> {
     }
 
     // Process all pairs (i, j) where i < j
-    // nfps is indexed as nfps[i][j-i-1] for pair (i, j)
     let mut all_nfp_vars = Vec::new();
     for nc_nfp in nc_nfps {
         let nfp_vars = add_nfp_vars(&mut model, nc_nfp)?;
@@ -413,6 +412,40 @@ fn add_nfp_constraints(
     let x_j = x_vars[nfp.j_piece_idx()];
     let y_j = y_vars[nfp.j_piece_idx()];
 
+    let b_top_xs = nfp.edges().filter(|e| e.is_top()).map(|e| e.v * e.b.x);
+    let a_bottom_xs = nfp.edges().filter(|e| !e.is_top()).map(|e| e.v * e.a.x);
+    let m_48 = -(s_ub - (bounds[nfp.i_piece_idx()].l_max + bounds[nfp.j_piece_idx()].l_min));
+    model.add_constr(
+        &format!(
+            "(48)_{}_{}_{}",
+            nfp.i_piece_idx(),
+            nfp.j_piece_idx(),
+            nfp.idx()
+        ),
+        c!(x_j - x_i
+            >= m_48 * nfp.left_var.v
+                + nfp.right_var.x_bound * nfp.right_var.v
+                + b_top_xs.grb_sum()
+                + a_bottom_xs.grb_sum()),
+    )?;
+
+    let a_top_xs = nfp.edges().filter(|e| e.is_top()).map(|e| e.v * e.a.x);
+    let b_bottom_xs = nfp.edges().filter(|e| !e.is_top()).map(|e| e.v * e.b.x);
+    let m_49 = s_ub - (bounds[nfp.i_piece_idx()].l_min + bounds[nfp.j_piece_idx()].l_max);
+    model.add_constr(
+        &format!(
+            "(49)_{}_{}_{}",
+            nfp.i_piece_idx(),
+            nfp.j_piece_idx(),
+            nfp.idx()
+        ),
+        c!(x_j - x_i
+            <= nfp.left_var.x_bound * nfp.left_var.v
+                + m_49 * nfp.right_var.v
+                + b_bottom_xs.grb_sum()
+                + a_top_xs.grb_sum()),
+    )?;
+
     for (edge_idx, EdgeVar { a, b, v }) in nfp.edges().enumerate() {
         // Constraint (22): half-plane constraint
         let c_val = b.y * a.x - b.x * a.y;
@@ -429,61 +462,61 @@ fn add_nfp_constraints(
             c!((b.x - a.x) * (y_j - y_i) + (a.y - b.y) * (x_j - x_i) + c_val <= (1.0 - *v) * m_22),
         )?;
 
-        if a.x > b.x {
-            // TOP edge: constraints (24) and (25)
-            let m_24 =
-                b.x + s_ub - bounds[nfp.i_piece_idx()].l_max - bounds[nfp.j_piece_idx()].l_min;
-            model.add_constr(
-                &format!(
-                    "top_left_{}_{}_{}_{}",
-                    nfp.i_piece_idx(),
-                    nfp.j_piece_idx(),
-                    nfp.idx(),
-                    edge_idx
-                ),
-                c!(b.x + x_i - x_j <= (1.0 - *v) * m_24),
-            )?;
-
-            let m_25 =
-                s_ub - bounds[nfp.j_piece_idx()].l_max - bounds[nfp.i_piece_idx()].l_min - a.x;
-            model.add_constr(
-                &format!(
-                    "top_right_{}_{}_{}_{}",
-                    nfp.i_piece_idx(),
-                    nfp.j_piece_idx(),
-                    nfp.idx(),
-                    edge_idx
-                ),
-                c!(x_j - x_i - a.x <= (1.0 - *v) * m_25),
-            )?;
-        } else {
-            // BOTTOM edge: constraints (26) and (27)
-            let m_26 =
-                a.x + s_ub - bounds[nfp.i_piece_idx()].l_max - bounds[nfp.j_piece_idx()].l_min;
-            model.add_constr(
-                &format!(
-                    "bottom_left_{}_{}_{}_{}",
-                    nfp.i_piece_idx(),
-                    nfp.j_piece_idx(),
-                    nfp.idx(),
-                    edge_idx
-                ),
-                c!(a.x + x_i - x_j <= (1.0 - *v) * m_26),
-            )?;
-
-            let m_27 =
-                s_ub - bounds[nfp.j_piece_idx()].l_max - bounds[nfp.i_piece_idx()].l_min - b.x;
-            model.add_constr(
-                &format!(
-                    "bottom_right_{}_{}_{}_{}",
-                    nfp.i_piece_idx(),
-                    nfp.j_piece_idx(),
-                    nfp.idx(),
-                    edge_idx
-                ),
-                c!(x_j - x_i - b.x <= (1.0 - *v) * m_27),
-            )?;
-        }
+        // if a.x > b.x {
+        //     // TOP edge: constraints (24) and (25)
+        //     let m_24 =
+        //         b.x + s_ub - bounds[nfp.i_piece_idx()].l_max - bounds[nfp.j_piece_idx()].l_min;
+        //     model.add_constr(
+        //         &format!(
+        //             "top_left_{}_{}_{}_{}",
+        //             nfp.i_piece_idx(),
+        //             nfp.j_piece_idx(),
+        //             nfp.idx(),
+        //             edge_idx
+        //         ),
+        //         c!(b.x + x_i - x_j <= (1.0 - *v) * m_24),
+        //     )?;
+        //
+        //     let m_25 =
+        //         s_ub - bounds[nfp.j_piece_idx()].l_max - bounds[nfp.i_piece_idx()].l_min - a.x;
+        //     model.add_constr(
+        //         &format!(
+        //             "top_right_{}_{}_{}_{}",
+        //             nfp.i_piece_idx(),
+        //             nfp.j_piece_idx(),
+        //             nfp.idx(),
+        //             edge_idx
+        //         ),
+        //         c!(x_j - x_i - a.x <= (1.0 - *v) * m_25),
+        //     )?;
+        // } else {
+        //     // BOTTOM edge: constraints (26) and (27)
+        //     let m_26 =
+        //         a.x + s_ub - bounds[nfp.i_piece_idx()].l_max - bounds[nfp.j_piece_idx()].l_min;
+        //     model.add_constr(
+        //         &format!(
+        //             "bottom_left_{}_{}_{}_{}",
+        //             nfp.i_piece_idx(),
+        //             nfp.j_piece_idx(),
+        //             nfp.idx(),
+        //             edge_idx
+        //         ),
+        //         c!(a.x + x_i - x_j <= (1.0 - *v) * m_26),
+        //     )?;
+        //
+        //     let m_27 =
+        //         s_ub - bounds[nfp.j_piece_idx()].l_max - bounds[nfp.i_piece_idx()].l_min - b.x;
+        //     model.add_constr(
+        //         &format!(
+        //             "bottom_right_{}_{}_{}_{}",
+        //             nfp.i_piece_idx(),
+        //             nfp.j_piece_idx(),
+        //             nfp.idx(),
+        //             edge_idx
+        //         ),
+        //         c!(x_j - x_i - b.x <= (1.0 - *v) * m_27),
+        //     )?;
+        // }
     }
 
     // Constraint (28): left region constraint
@@ -515,7 +548,12 @@ fn add_nfp_constraints(
     let mut all_region_vars = vec![nfp.left_var.v, nfp.right_var.v];
     all_region_vars.extend(nfp.edge_vars.iter().map(|e| &e.v));
     model.add_constr(
-        &format!("one_region_{}_{}", nfp.i_piece_idx(), nfp.j_piece_idx(),),
+        &format!(
+            "one_region_{}_{}_{}",
+            nfp.i_piece_idx(),
+            nfp.j_piece_idx(),
+            nfp.idx()
+        ),
         c!(all_region_vars.grb_sum() == 1),
     )?;
 
@@ -529,7 +567,6 @@ fn add_identical_piece_triplet_constraints<S: Tree>(
 ) -> Result<(), grb::Error> {
     let n = trees.len();
 
-    // Build lookup: (i, j) -> Vec<&NfpVarInfo> for all NFP parts between i and j
     let mut nfp_lookup: HashMap<(usize, usize), Vec<&NfpVarInfo>> = HashMap::new();
     for nfp_info in all_nfp_vars {
         nfp_lookup
@@ -538,16 +575,14 @@ fn add_identical_piece_triplet_constraints<S: Tree>(
             .push(nfp_info);
     }
 
-    // For all triplets (i, j, u) where i < j < u and pieces j, u are identical
+    let mut constr_idx = 0;
     for i in 0..n {
         for j in (i + 1)..n {
             for u in (j + 1)..n {
-                // Check if j and u are identical pieces
                 if trees[j].rotation() != trees[u].rotation() {
                     continue;
                 }
 
-                // Get NFP parts for (i, j) and (i, u)
                 let nfps_ij = match nfp_lookup.get(&(i, j)) {
                     Some(v) => v,
                     None => continue,
@@ -557,35 +592,34 @@ fn add_identical_piece_triplet_constraints<S: Tree>(
                     None => continue,
                 };
 
-                // Collect all top region vars from (i, j) NFPs
-                let mut top_vars_ij: Vec<Var> = Vec::new();
-                for nfp_info in nfps_ij {
-                    for e in &nfp_info.edge_vars {
-                        if e.is_top() {
-                            top_vars_ij.push(e.v);
+                // One constraint per (NFP part from (i,j), NFP part from (i,u)) pair
+                for nfp_ij in nfps_ij {
+                    for nfp_iu in nfps_iu {
+                        let top_vars: Vec<Var> = nfp_ij
+                            .edge_vars
+                            .iter()
+                            .filter(|e| e.is_top())
+                            .map(|e| e.v)
+                            .collect();
+
+                        let bottom_vars: Vec<Var> = nfp_iu
+                            .edge_vars
+                            .iter()
+                            .filter(|e| !e.is_top())
+                            .map(|e| e.v)
+                            .collect();
+
+                        if !top_vars.is_empty() && !bottom_vars.is_empty() {
+                            let mut all_vars = top_vars;
+                            all_vars.extend(bottom_vars);
+
+                            model.add_constr(
+                                &format!("identical_triplet_{}_{}_{}_{}", i, j, u, constr_idx),
+                                c!(all_vars.iter().grb_sum() <= 1),
+                            )?;
+                            constr_idx += 1;
                         }
                     }
-                }
-
-                // Collect all bottom region vars from (i, u) NFPs
-                let mut bottom_vars_iu: Vec<Var> = Vec::new();
-                for nfp_info in nfps_iu {
-                    for e in &nfp_info.edge_vars {
-                        if !e.is_top() {
-                            bottom_vars_iu.push(e.v);
-                        }
-                    }
-                }
-
-                // Constraint (35): sum of tops(i,j) + sum of bottoms(i,u) <= 1
-                if !top_vars_ij.is_empty() && !bottom_vars_iu.is_empty() {
-                    let mut all_vars: Vec<Var> = top_vars_ij;
-                    all_vars.extend(bottom_vars_iu);
-
-                    model.add_constr(
-                        &format!("identical_triplet_{}_{}_{}", i, j, u),
-                        c!(all_vars.iter().grb_sum() <= 1),
-                    )?;
                 }
             }
         }
