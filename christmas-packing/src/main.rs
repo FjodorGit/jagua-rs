@@ -30,17 +30,14 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+// 1: deg = 45.
 // 2: deg1 = tan^{-1}(35/80), deg2 = deg1 + 180
 
 fn main() -> Result<()> {
-    let trees = [
-        SimpleTree::new(23.),
-        SimpleTree::new(23.),
-        SimpleTree::new(23.),
-        SimpleTree::new(203.),
-        SimpleTree::new(203.),
-        SimpleTree::new(203.),
-    ];
+    // 23.62937
+    // 36.02737
+    let deg = 23.62;
+    let trees = [SimpleTree::new(deg), SimpleTree::new(deg + 180.)];
     let solution = solve_packing(&trees)?;
 
     println!("Solution found!");
@@ -181,7 +178,7 @@ fn plot_solution<S: Tree>(shapes: &[S], sol: Solution, filename: &str) {
 
     // Draw square boundary
     svg.push_str(&format!(
-        r#"<rect x="0" y="0" width="{}" height="{}" fill="lightgray" fill-opacity="0.2" stroke="red" />
+        r#"<rect x="0" y="0" width="{}" height="{}" fill="lightgray" fill-opacity="0.2" stroke="black" stroke-width="0.1" />
 "#,
         sol.s, sol.s
     ));
@@ -198,9 +195,9 @@ fn plot_solution<S: Tree>(shapes: &[S], sol: Solution, filename: &str) {
             .join(" ");
 
         svg.push_str(&format!(
-            r#"<polygon points="{}" fill="{}" stroke="black" fill-opacity="0.6" />
+            r#"<polygon points="{}" fill="{}" stroke="black" stroke-width="0.1" fill-opacity="0.6" />
 "#,
-            points_str, color,
+            points_str, color
         ));
     }
 
