@@ -1,49 +1,70 @@
 use std::collections::HashSet;
 
-pub fn greedy_edge_clique_cover(n: usize, edges: &[(u32, u32)]) -> Vec<Vec<usize>> {
-    // Adjacency set for quick lookup
+pub fn edge_clique_cover(n: usize, edges: &[(u32, u32)]) -> Vec<Vec<usize>> {
+    // Build adjacency sets
     let mut adj: Vec<HashSet<usize>> = vec![HashSet::new(); n];
     for &(u, v) in edges {
         adj[u as usize].insert(v as usize);
         adj[v as usize].insert(u as usize);
     }
 
-    // Track uncovered edges
-    let mut uncovered: HashSet<(usize, usize)> = edges
-        .iter()
-        .map(|&(u, v)| (u as usize, v as usize))
-        .collect();
+    let mut cover: Vec<Vec<usize>> = Vec::new();
 
-    let mut cliques: Vec<Vec<usize>> = Vec::new();
+    // Process nodes in order
+    for i in 0..n {
+        // W = neighbors j < i (edges that need to be covered)
+        let mut w: HashSet<usize> = adj[i].iter().filter(|&&j| j < i).copied().collect();
 
-    while !uncovered.is_empty() {
-        // Pick an uncovered edge
-        let &(u, v) = uncovered.iter().next().unwrap();
+        if w.is_empty() {
+            // No edges to cover, create singleton clique
+            cover.push(vec![i]);
+            continue;
+        }
 
-        // Greedily extend to a clique starting from {u, v}
-        let mut clique: Vec<usize> = vec![u, v];
-        let mut candidates: Vec<usize> = adj[u].intersection(&adj[v]).copied().collect();
-
-        while let Some(w) = candidates.pop() {
-            // Check if w is connected to all current clique members
-            if clique.iter().all(|&c| adj[w].contains(&c)) {
-                clique.push(w);
-                // Update candidates: must be connected to w as well
-                candidates.retain(|&c| adj[w].contains(&c));
+        // Try to add i to existing cliques
+        for clique in cover.iter_mut() {
+            if can_include(i, clique, &adj) {
+                clique.push(i);
+                // Remove covered edges from w
+                for &j in clique.iter() {
+                    w.remove(&j);
+                }
+                if w.is_empty() {
+                    break;
+                }
             }
         }
 
-        // Mark all edges in this clique as covered
-        for i in 0..clique.len() {
-            for j in (i + 1)..clique.len() {
-                let (a, b) = (clique[i], clique[j]);
-                uncovered.remove(&(a, b));
-                uncovered.remove(&(b, a));
-            }
-        }
+        // For remaining uncovered edges, create new cliques
+        while !w.is_empty() {
+            // Find existing clique with maximum intersection with w
+            let maximal_clique = find_maximal_clique(&cover, &w);
 
-        cliques.push(clique);
+            // Create new clique from intersection + i
+            let mut new_clique: Vec<usize> = match maximal_clique {
+                Some(clique) => clique.iter().filter(|j| w.contains(j)).copied().collect(),
+                None => vec![*w.iter().next().unwrap()],
+            };
+            new_clique.push(i);
+
+            // Remove covered edges from w
+            for &j in &new_clique {
+                w.remove(&j);
+            }
+
+            cover.push(new_clique);
+        }
     }
 
-    cliques
+    cover
+}
+
+fn can_include(node: usize, clique: &[usize], adj: &[HashSet<usize>]) -> bool {
+    clique.iter().all(|&k| adj[node].contains(&k))
+}
+
+fn find_maximal_clique<'a>(cover: &'a [Vec<usize>], w: &HashSet<usize>) -> Option<&'a Vec<usize>> {
+    cover
+        .iter()
+        .max_by_key(|clique| clique.iter().filter(|j| w.contains(j)).count())
 }

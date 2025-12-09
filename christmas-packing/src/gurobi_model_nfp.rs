@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, f64::NEG_INFINITY};
 
 use grb::prelude::*;
 use nfp::Point;
 use petgraph::{adj::NodeIndex, algo::maximal_cliques, graph::UnGraph};
 
 use crate::{
-    edge_clique_cover::greedy_edge_clique_cover,
+    edge_clique_cover::edge_clique_cover,
     ncnfp::{NcNfp, Nfp, compute_nfps},
     tree::{PieceBounds, Tree},
 };
@@ -28,10 +28,15 @@ impl EdgeVar {
         self.a.x > self.b.x - 1e-10
     }
 
-    fn point_is_to_the_right(&self, c: Point) -> bool {
+    fn point_is_to_the_right(&self, c: &Point) -> bool {
         let cross =
             (self.b.x - self.a.x) * (c.y - self.a.y) - (self.b.y - self.a.y) * (c.x - self.a.x);
         cross < 0.
+    }
+
+    fn straight_line(&self, x: f64) -> f64 {
+        let m = (self.b.y - self.a.y) / (self.b.x - self.b.y);
+        m * (x - self.a.x) + self.a.y
     }
 
     fn left_bound(&self) -> f64 {
@@ -42,14 +47,30 @@ impl EdgeVar {
         self.a.x.max(self.b.x)
     }
 
+    fn left_height(&self) -> f64 {
+        if self.is_top() {
+            return self.b.y;
+        } else {
+            return self.a.y;
+        }
+    }
+
+    fn right_height(&self) -> f64 {
+        if self.is_top() {
+            return self.a.y;
+        } else {
+            return self.b.y;
+        }
+    }
+
     fn contains(&self, other: &Self) -> bool {
         if self.is_top() != other.is_top() {
             return false;
         }
         self.left_bound() <= other.left_bound() - 1e-10
             && self.right_bound() >= other.right_bound() + 1e-10
-            && self.point_is_to_the_right(other.a)
-            && self.point_is_to_the_right(other.b)
+            && self.point_is_to_the_right(&other.a)
+            && self.point_is_to_the_right(&other.b)
     }
 }
 
@@ -94,32 +115,18 @@ impl RegionGeometry {
                 r_other.x_bound < edge.right_bound()
             }
             (RegionGeometry::Slice(edge_self), RegionGeometry::Slice(edge_other)) => {
-                let EdgeVar { a, b, .. } = *edge_self;
-                let EdgeVar { a: c, b: d, .. } = edge_other;
-                // Check if segment (c,d) projects onto the "span" of segment (a,b)
-                // when viewed perpendicular to (a,b)
-                let cross1_c = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-                let cross1_d = (b.x - a.x) * (d.y - a.y) - (b.y - a.y) * (d.x - a.x);
+                if edge_self.left_bound() > edge_other.right_bound()
+                    || edge_self.right_bound() < edge_other.left_bound()
+                {
+                    return false;
+                }
 
-                let cross2_a = (d.x - c.x) * (a.y - c.y) - (d.y - c.y) * (a.x - c.x);
-                let cross2_b = (d.x - c.x) * (b.y - c.y) - (d.y - c.y) * (b.x - c.x);
+                if edge_self.is_top() == edge_other.is_top() {
+                    return true;
+                }
 
-                let proj_c = (c.x - a.x) * (b.x - a.x) + (c.y - a.y) * (b.y - a.y);
-                let proj_d = (d.x - a.x) * (b.x - a.x) + (d.y - a.y) * (b.y - a.y);
-                let len_ab_sq = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
-
-                let proj_a = (a.x - c.x) * (d.x - c.x) + (a.y - c.y) * (d.y - c.y);
-                let proj_b = (b.x - c.x) * (d.x - c.x) + (b.y - c.y) * (d.y - c.y);
-                let len_cd_sq = (d.x - c.x) * (d.x - c.x) + (d.y - c.y) * (d.y - c.y);
-
-                let overlap1 =
-                    (proj_c >= 0. || proj_d >= 0.) && (proj_c <= len_ab_sq || proj_d <= len_ab_sq);
-                let overlap2 =
-                    (proj_a >= 0. || proj_b >= 0.) && (proj_a <= len_cd_sq || proj_b <= len_cd_sq);
-                (cross1_c <= 0. || cross1_d <= 0.)
-                    && (cross2_a <= 0. || cross2_b <= 0.)
-                    && overlap1
-                    && overlap2
+                edge_self.straight_line(edge_other.left_bound()) < edge_other.left_height()
+                    || edge_self.straight_line(edge_other.right_bound()) < edge_other.right_height()
             }
             _ => true,
         }
@@ -388,7 +395,7 @@ fn add_nfp_vars(model: &mut Model, nc_nfp: NcNfp) -> Result<Vec<NfpVarInfo>, grb
         nfp_var_infos.push(nfp_var);
     }
     add_subsumption_constraints(model, &nfp_var_infos)?;
-    // add_clique_based_constraints(model, &nfp_var_infos)?;
+    add_clique_based_constraints(model, &nfp_var_infos)?;
     Ok(nfp_var_infos)
 }
 
@@ -657,6 +664,10 @@ fn add_clique_based_constraints(
             // Only consider regions from different NFP parts
             if fg_k != fg_l && !region_k.intersects(region_l) {
                 edges.push((k as u32, l as u32));
+                model.add_constr(
+                    &format!("clique_{}_{}_{}_{}", i, j, k, l),
+                    c!(region_k.var() + region_l.var() <= 1),
+                )?;
             }
         }
     }
@@ -666,7 +677,7 @@ fn add_clique_based_constraints(
     }
 
     // Build graph and find maximal cliques
-    let cliques = greedy_edge_clique_cover(n, &edges);
+    let cliques = edge_clique_cover(n, &edges);
 
     // Add constraint for each clique with more than one node
     for (clique_idx, clique) in cliques.iter().enumerate() {

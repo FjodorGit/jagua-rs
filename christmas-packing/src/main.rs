@@ -33,10 +33,12 @@ use std::process::exit;
 
 fn main() -> Result<()> {
     let trees = [
-        ChristmasTree::new(23.),
-        ChristmasTree::new(90.),
-        ChristmasTree::new(203.),
-        ChristmasTree::new(270.),
+        SimpleTree::new(23.),
+        SimpleTree::new(23.),
+        SimpleTree::new(45.),
+        SimpleTree::new(203.),
+        SimpleTree::new(203.),
+        SimpleTree::new(225.),
     ];
     let solution = solve_packing(&trees)?;
 
